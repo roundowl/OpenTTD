@@ -44,6 +44,7 @@
 #include "field_func.h"
 #include "cargopacket.h"
 #include "timetable.h"
+#include "timer/timer_game_tick.h"
 
 #include "table/strings.h"
 
@@ -1471,15 +1472,16 @@ static bool IsFieldPathBlocked(const RoadVehicle *v, const Field *f, int dx, int
 static bool RoadVehFieldStep(RoadVehicle *v, Field *f)
 {
 	RoadVehFieldWork &w = v->field_work;
+
+	/* Reaching a waypoint costs no movement: handle it and drive on towards the next one in the same step. */
+	while (w.step < w.route.size() && v->x_pos == w.route[w.step].x && v->y_pos == w.route[w.step].y) {
+		/* On the centre of a quarter to work: work it while driving on. */
+		if (w.kind == FieldRouteKind::Work && w.route[w.step].work && !RoadVehFieldWorkQuarter(v, f, w.route[w.step])) return true;
+		w.step++;
+	}
 	if (w.step >= w.route.size()) return RoadVehFieldRouteEnd(v, f);
 
 	const FieldWaypoint &target = w.route[w.step];
-	if (v->x_pos == target.x && v->y_pos == target.y) {
-		/* On the centre of a quarter to work: work it while driving on. */
-		if (w.kind == FieldRouteKind::Work && target.work && !RoadVehFieldWorkQuarter(v, f, target)) return true;
-		w.step++;
-		return true;
-	}
 
 	int dx = Clamp(target.x - v->x_pos, -1, 1);
 	int dy = Clamp(target.y - v->y_pos, -1, 1);

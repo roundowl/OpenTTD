@@ -4634,6 +4634,8 @@ STR_VEHICLE_STATUS_AIRCRAFT_TOO_FAR                             :{ORANGE}Too far
 STR_VEHICLE_STATUS_HEADING_FOR_STATION_VEL                      :{LTBLUE}{1:VELOCITY} - Heading for {0:STATION}
 STR_VEHICLE_STATUS_NO_ORDERS_VEL                                :{LTBLUE}{VELOCITY} - No orders
 STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL                     :{LTBLUE}{1:VELOCITY} - Heading for {0:WAYPOINT}
+STR_VEHICLE_STATUS_HEADING_FOR_FIELD_VEL                        :{LTBLUE}{1:VELOCITY} - Heading to work on {0:STATION} field
+STR_VEHICLE_STATUS_WORKING_FIELD                                :{LTBLUE}Working on {STATION} field
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_VEL                        :{ORANGE}{1:VELOCITY} - Heading for {0:DEPOT}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_SERVICE_VEL                :{LTBLUE}{1:VELOCITY} - Service at {0:DEPOT}
 STR_VEHICLE_STATUS_HEADING_FOR_DEPOT_UNBUNCH_VEL                :{LTBLUE}{1:VELOCITY} - Unbunch and service at {0:DEPOT}
@@ -4856,6 +4858,7 @@ STR_ORDERS_VEH_WITH_SHARED_ORDERS_LIST_TOOLTIP                  :{BLACK}Show all
 
 # String parts to build the order string
 STR_ORDER_GO_TO_WAYPOINT                                        :Go via {WAYPOINT}
+STR_ORDER_WORK_FIELD                                            :Work on {STATION} field
 STR_ORDER_GO_NON_STOP_TO_WAYPOINT                               :Go non-stop via {WAYPOINT}
 
 STR_ORDER_SERVICE_AT                                            :Service at
@@ -5453,6 +5456,7 @@ STR_ERROR_MUST_REMOVE_FIELD_FIRST                               :must remove the
 STR_ERROR_FIELD_TOO_SMALL                                       :field must be at least 2x2 tiles
 STR_ERROR_FIELD_TOO_LARGE                                       :field sides must be at most 16 tiles
 STR_ERROR_TOO_MANY_FIELDS                                       :too many farm fields
+STR_ERROR_NOT_FARM_MACHINE                                      :... vehicle is not farm machinery
 STR_ERROR_FIELD_NOTHING_TO_DO                                   :nothing to do on this field right now
 STR_ERROR_FIELD_TOO_MANY_TASKS                                  :too many tasks in the plan
 STR_ERROR_CAN_T_MODIFY_FIELD_PLAN                               :Can't change the field plan...

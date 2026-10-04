@@ -460,6 +460,7 @@ void AfterLoadVehiclesPhase2(bool part_of_load)
 					for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
 						u->roadtype = rv->roadtype;
 						u->compatible_roadtypes = rv->compatible_roadtypes;
+						if (u->state == RVSB_IN_FIELD) continue; // Farm fork: no road inside fields.
 						if (GetRoadType(u->tile, rtt) == INVALID_ROADTYPE) SlErrorCorrupt("Road vehicle on invalid road type");
 					}
 
@@ -865,6 +866,16 @@ public:
 		SaveLoad::Variable<VarFileType::U8>("overtaking_ctr", SLE_OBJECT_ADDRESS(RoadVehicle, overtaking_ctr)),
 		SaveLoad::Variable<VarFileType::U16>("crashed_ctr", SLE_OBJECT_ADDRESS(RoadVehicle, crashed_ctr)),
 		SaveLoad::Variable<VarFileType::U8>("reverse_ctr", SLE_OBJECT_ADDRESS(RoadVehicle, reverse_ctr)),
+		SaveLoad::Variable<VarFileType::U16>("field_work.field", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.field)),
+		SaveLoad::Variable<VarFileType::U8>("field_work.kind", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.kind)),
+		SaveLoad::Variable<VarFileType::U8>("field_work.task", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.task)),
+		SaveLoad::Variable<VarFileType::U16>("field_work.step", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.step)),
+		SaveLoad::Variable<VarFileType::U16>("field_work.backtrack_from", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.backtrack_from)),
+		SaveLoad::Variable<VarFileType::Bool>("field_work.advance_order", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.advance_order)),
+		SaveLoad::Variable<VarFileType::U8>("field_work.bay_trackdir", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.bay_trackdir)),
+		SaveLoad::Variable<VarFileType::U8>("field_work.bay_direction", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.bay_direction)),
+		SaveLoad::Variable<VarFileType::I32>("field_work.bay_x", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.bay_x)),
+		SaveLoad::Variable<VarFileType::I32>("field_work.bay_y", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.bay_y)),
 		SaveLoad::Vector<VarFileType::U8>("path.td", SLE_GLOBAL_ADDRESS(rv_path_td), SaveLoadVersion::RoadvehPathCache, SaveLoadVersion::PathCacheFormat),
 		SaveLoad::Vector<VarFileType::U32>("path.tile", SLE_GLOBAL_ADDRESS(rv_path_tile), SaveLoadVersion::RoadvehPathCache, SaveLoadVersion::PathCacheFormat),
 		SaveLoad::StructList<SlVehicleRoadVehPath>("path", SaveLoadVersion::PathCacheFormat),

@@ -27,6 +27,8 @@
 #include "road.h"
 #include "road_func.h"
 #include "road_map.h"
+#include "road_cmd.h"
+#include "town_type.h"
 #include "slope_func.h"
 #include "station_base.h"
 #include "station_cmd.h"
@@ -34,6 +36,7 @@
 #include "vehicle_func.h"
 #include "viewport_func.h"
 #include "window_func.h"
+#include "order_func.h"
 #include "timer/timer_game_calendar.h"
 
 #include "table/strings.h"
@@ -70,16 +73,30 @@ void DrawRailFenceOnBorder(const TileInfo *ti, DiagDirection side, PaletteID pal
 }
 
 /**
- * Does the neighbouring tile in the given direction offer a road connection back to us?
+ * Get the field whose entry corner belongs to a station.
+ * @param station Any station.
+ * @return The field, or \c nullptr if the station has no field.
+ */
+/* static */ Field *Field::GetByStation(StationID station)
+{
+	for (Field *f : Field::Iterate()) {
+		if (f->station == station) return f;
+	}
+	return nullptr;
+}
+
+/**
+ * How well does the neighbouring tile in the given direction serve as access road?
  * @param tile The tile we are looking from.
  * @param dir Direction towards the neighbour.
- * @return True if the neighbour has road bits pointing at \a tile.
+ * @return 2 if it has road pointing at \a tile, 1 if it is a plain road tile that can be connected, else 0.
  */
-static bool HasRoadConnectionFrom(TileIndex tile, DiagDirection dir)
+static int GetRoadAccessScore(TileIndex tile, DiagDirection dir)
 {
 	TileIndex neighbour = TileAddByDiagDir(tile, dir);
-	if (!IsValidTile(neighbour)) return false;
-	return GetAnyRoadBits(neighbour, RoadTramType::Road).Any(DiagDirToRoadBits(ReverseDiagDir(dir)));
+	if (!IsValidTile(neighbour)) return 0;
+	if (GetAnyRoadBits(neighbour, RoadTramType::Road).Any(DiagDirToRoadBits(ReverseDiagDir(dir)))) return 2;
+	return IsNormalRoadTile(neighbour) && HasTileRoadType(neighbour, RoadTramType::Road) ? 1 : 0;
 }
 
 /**
@@ -94,9 +111,9 @@ static DiagDirection ChooseFieldEntrance(const TileArea &area, TileIndex corner)
 	DiagDirection out_x = (TileX(corner) == TileX(area.tile)) ? DiagDirection::NE : DiagDirection::SW;
 	DiagDirection out_y = (TileY(corner) == TileY(area.tile)) ? DiagDirection::NW : DiagDirection::SE;
 
-	bool road_x = HasRoadConnectionFrom(corner, out_x);
-	bool road_y = HasRoadConnectionFrom(corner, out_y);
-	if (road_x != road_y) return road_x ? out_x : out_y;
+	int road_x = GetRoadAccessScore(corner, out_x);
+	int road_y = GetRoadAccessScore(corner, out_y);
+	if (road_x != road_y) return road_x > road_y ? out_x : out_y;
 
 	/* No preference from roads; face out of the longer side. */
 	return area.w >= area.h ? out_y : out_x;
@@ -139,6 +156,13 @@ CommandCost CmdBuildField(DoCommandFlags flags, TileIndex tile, TileIndex start_
 	CommandCost ret = Command<Commands::BuildRoadStop>::Do(flags, start_tile, 1, 1, RoadStopType::Truck, false, entrance, rt, ROADSTOP_CLASS_DFLT, 0, NEW_STATION, true);
 	if (ret.Failed()) return ret;
 	cost.AddCost(ret.GetCost());
+
+	/* Connect the bay to the road in front of it, if that road does not point at it yet. */
+	if (GetRoadAccessScore(start_tile, entrance) == 1) {
+		TileIndex road = TileAddByDiagDir(start_tile, entrance);
+		CommandCost connect = Command<Commands::BuildRoad>::Do(flags, road, DiagDirToRoadBits(ReverseDiagDir(entrance)), GetRoadType(road, RoadTramType::Road), {}, TownID::Invalid());
+		if (connect.Succeeded()) cost.AddCost(connect.GetCost());
+	}
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		Field *f = Field::Create();
@@ -236,6 +260,7 @@ CommandCost CmdModifyFieldTasks(DoCommandFlags flags, FieldID field_id, FieldTas
 static void ReallyRemoveField(Field *f)
 {
 	CloseWindowById(WindowClass::FieldView, f->index);
+	RemoveOrderFromAllVehicles(OT_WORK_FIELD, f->station);
 	for (TileIndex cur_tile : f->location) {
 		if (!IsTileType(cur_tile, TileType::Field)) continue;
 		MakeField(cur_tile, 0, IndustryID::Invalid());

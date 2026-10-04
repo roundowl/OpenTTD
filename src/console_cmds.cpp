@@ -49,6 +49,14 @@
 #include "field_base.h"
 #include "field_cmd.h"
 #include "field_map.h"
+#include "engine_base.h"
+#include "engine_func.h"
+#include "order_cmd.h"
+#include "road_cmd.h"
+#include "vehicle_cmd.h"
+#include "vehicle_func.h"
+#include "field_func.h"
+#include "roadveh.h"
 #include "viewport_func.h"
 #include "road_map.h"
 #include "tilearea_spiral.h"
@@ -503,6 +511,80 @@ static bool ConFarmChecker(std::span<std::string_view> argv)
 }
 
 /**
+ * Farm fork debug helper: build a field, a depot next to a road near it, a tractor and a
+ * combine harvester with orders to work on the field, and start them.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConFarmDemo(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build a farm field with a tractor and a combine harvester working on it. Usage: 'farm_demo'.");
+		return true;
+	}
+	if (!Company::IsValidID(_local_company)) return true;
+
+	std::array<std::string_view, 1> field_args{"farm_field"};
+	ConFarmField(field_args);
+	Field *f = nullptr;
+	for (Field *it : Field::Iterate()) f = it;
+	if (f == nullptr) return true;
+
+	Backup<CompanyID> cur_company(_current_company, _local_company);
+
+	/* A depot next to a road, close to the field. */
+	TileIndex depot = INVALID_TILE;
+	for (TileIndex t : SpiralTileSequence(f->corner, 15)) {
+		if (f->location.Contains(t) || (!IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) || GetTileSlope(t) != SLOPE_FLAT) continue;
+		for (DiagDirection dir = DiagDirection::Begin; dir < DiagDirection::End; dir++) {
+			TileIndex road = TileAddByDiagDir(t, dir);
+			if (!IsValidTile(road) || !IsNormalRoadTile(road) || f->location.Contains(road)) continue;
+			if (Command<Commands::BuildRoadDepot>::Do(DoCommandFlags{DoCommandFlag::Auto, DoCommandFlag::NoWater}, t, ROADTYPE_ROAD, dir).Failed()) continue;
+			Command<Commands::BuildRoadDepot>::Do(DoCommandFlags{DoCommandFlag::Execute, DoCommandFlag::Auto, DoCommandFlag::NoWater}, t, ROADTYPE_ROAD, dir);
+			/* Connect the depot to the road. */
+			Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, road, DiagDirToRoadBits(ReverseDiagDir(dir)), ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+			depot = t;
+			break;
+		}
+		if (depot != INVALID_TILE) break;
+	}
+	if (depot == INVALID_TILE) {
+		IConsolePrint(CC_ERROR, "No depot spot found.");
+		return true;
+	}
+
+	for (uint local_id : {88u, 89u}) {
+		EngineID engine = EngineID::Invalid();
+		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+			if (e->grf_prop.local_id == local_id && e->GetGRF() == nullptr) engine = e->index;
+		}
+		if (engine == EngineID::Invalid() || !IsEngineBuildable(engine, VehicleType::Road, _local_company)) {
+			IConsolePrint(CC_ERROR, "Farm engine {} not buildable.", local_id);
+			continue;
+		}
+		auto [ret, veh, refit_capacity, refit_mail, capacities] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, engine, false, INVALID_CARGO, ClientID::Invalid);
+		if (ret.Failed()) {
+			IConsolePrint(CC_ERROR, "Building farm engine {} failed.", local_id);
+			continue;
+		}
+		Order order;
+		order.MakeWorkField(f->station);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, order);
+		if (local_id == 89) {
+			/* The harvester drops its load at the field's own bay for lorries to collect. */
+			Order unload;
+			unload.MakeGoToStation(f->station);
+			unload.SetUnloadType(OrderUnloadType::Transfer);
+			unload.SetLoadType(OrderLoadType::NoLoad);
+			unload.SetStopLocation(OrderStopLocation::FarEnd);
+			if (Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, unload).Failed()) IConsolePrint(CC_ERROR, "Unload order rejected.");
+		}
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+		IConsolePrint(CC_DEFAULT, "Vehicle {} built in depot {} and sent to work on field {}.", veh, depot, f->index);
+	}
+	return true;
+}
+
+/**
  * Farm fork debug helper: list all fields.
  * @copydoc IConsoleCmdProc
  */
@@ -514,7 +596,13 @@ static bool ConFarmList(std::span<std::string_view> argv)
 	}
 	IConsolePrint(CC_DEFAULT, "{} field(s).", Field::GetNumItems());
 	for (const Field *f : Field::Iterate()) {
-		IConsolePrint(CC_DEFAULT, "  #{}: owner {}, corner {} ({}, {}), {}x{}, station {}", f->index, f->owner, f->corner, TileX(f->corner), TileY(f->corner), f->location.w, f->location.h, f->station);
+		IConsolePrint(CC_DEFAULT, "  #{}: owner {}, corner {} ({}, {}), {}x{}, station {}, task {}, last harvest {}", f->index, f->owner, f->corner, TileX(f->corner), TileY(f->corner), f->location.w, f->location.h, f->station, f->cur_task, f->last_harvest);
+	}
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine() || !IsFieldMachine(rv)) continue;
+		IConsolePrint(CC_DEFAULT, "  vehicle {}: {} orders, cur {}, state {:#x}, order type {}, field {}, kind {}, task {}, step {}/{}, cargo {}/{}", rv->unitnumber, rv->GetNumOrders(), rv->cur_real_order_index, rv->state, to_underlying(rv->current_order.GetType()),
+				rv->state == RVSB_IN_FIELD ? static_cast<int>(rv->field_work.field.base()) : -1, to_underlying(rv->field_work.kind), to_underlying(rv->field_work.task),
+				rv->field_work.step, rv->field_work.route.size(), rv->cargo.StoredCount(), rv->cargo_cap);
 	}
 	return true;
 }
@@ -3095,6 +3183,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("scrollto",                ConScrollToTile);
 	IConsole::CmdRegister("farm_field",              ConFarmField,        ConHookNoNetwork);
 	IConsole::CmdRegister("farm_list",               ConFarmList);
+	IConsole::CmdRegister("farm_demo",               ConFarmDemo,         ConHookNoNetwork);
 	IConsole::CmdRegister("farm_checker",            ConFarmChecker,      ConHookNoNetwork);
 	IConsole::CmdRegister("alias",                   ConAlias);
 	IConsole::CmdRegister("load",                    ConLoad);

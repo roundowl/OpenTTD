@@ -3246,6 +3246,13 @@ public:
 				return GetString(v->vehicle_flags.Test(VehicleFlag::PathfinderLost) ? STR_VEHICLE_STATUS_CANNOT_REACH_WAYPOINT_VEL : STR_VEHICLE_STATUS_HEADING_FOR_WAYPOINT_VEL,
 					v->current_order.GetDestination(),PackVelocity(v->GetDisplaySpeed(), v->type));
 
+			case OT_WORK_FIELD:
+				if (v->type == VehicleType::Road && RoadVehicle::From(v)->state == RVSB_IN_FIELD) {
+					return GetString(STR_VEHICLE_STATUS_WORKING_FIELD, v->current_order.GetDestination());
+				}
+				return GetString(v->vehicle_flags.Test(VehicleFlag::PathfinderLost) ? STR_VEHICLE_STATUS_CANNOT_REACH_STATION_VEL : STR_VEHICLE_STATUS_HEADING_FOR_FIELD_VEL,
+					v->current_order.GetDestination(), PackVelocity(v->GetDisplaySpeed(), v->type));
+
 			case OT_LEAVESTATION:
 				if (v->type != VehicleType::Aircraft) {
 					return GetString(STR_VEHICLE_STATUS_LEAVING);

@@ -64,6 +64,7 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 	void Grow();
 	uint CountEligibleQuarters(FieldTaskType type) const;
 	CommandCost PerformCurrentTask(DoCommandFlags flags);
+	int WorkQuarter(TileIndex tile, uint quarter, FieldTaskType type);
 
 	/**
 	 * Get the current task, if the plan has any.
@@ -76,6 +77,7 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 
 	static Field *GetByTile(TileIndex tile);
 	static Field *GetByCornerTile(TileIndex tile);
+	static Field *GetByStation(StationID station);
 };
 
 CargoType GetDefaultFieldCrop();

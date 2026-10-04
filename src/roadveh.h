@@ -17,6 +17,7 @@
 #include "road.h"
 #include "road_map.h"
 #include "newgrf_engine.h"
+#include "field_type.h"
 
 struct RoadVehicle;
 
@@ -35,6 +36,7 @@ enum RoadVehicleStates : uint8_t {
 	 */
 
 	/* Numeric values */
+	RVSB_IN_FIELD                = 0xFD,                      ///< Farm fork: the vehicle is working inside a field
 	RVSB_IN_DEPOT                = 0xFE,                      ///< The vehicle is in a depot
 	RVSB_WORMHOLE                = 0xFF,                      ///< The vehicle is in a tunnel and/or bridge
 
@@ -99,6 +101,21 @@ struct RoadVehPathElement {
 
 using RoadVehPathCache = std::vector<RoadVehPathElement>;
 
+/** Farm fork: state of a road vehicle working inside a field (#RVSB_IN_FIELD). */
+struct RoadVehFieldWork {
+	FieldID field = FieldID::Invalid(); ///< The field the vehicle is in.
+	FieldRouteKind kind = FieldRouteKind::Work; ///< What the vehicle is doing.
+	FieldTaskType task = FieldTaskType::Cultivate; ///< Task of the work route.
+	uint16_t step = 0; ///< Index into #route of the waypoint being driven to.
+	uint16_t backtrack_from = 0; ///< Work route step at which a backtrack started.
+	bool advance_order = false; ///< Whether to move to the next order on reaching the entry corner.
+	uint8_t bay_trackdir = 0; ///< Track direction the vehicle entered the bay with.
+	Direction bay_direction = Direction::N; ///< Direction of the vehicle when stopped in the bay.
+	int32_t bay_x = 0; ///< World X of the bay stop position.
+	int32_t bay_y = 0; ///< World Y of the bay stop position.
+	std::vector<FieldWaypoint> route{}; ///< NOSAVE: route cache, rebuilt from the fields above.
+};
+
 /**
  * Buses, trucks and trams belong to this class.
  */
@@ -111,6 +128,7 @@ struct RoadVehicle final : public GroundVehicle<RoadVehicle, VehicleType::Road> 
 	uint8_t overtaking_ctr = 0; ///< The length of the current overtake attempt.
 	uint16_t crashed_ctr = 0; ///< Animation counter when the vehicle has crashed. @see RoadVehIsCrashed
 	uint8_t reverse_ctr = 0;
+	RoadVehFieldWork field_work{}; ///< Farm fork: field work state, valid while #state is #RVSB_IN_FIELD.
 
 	RoadType roadtype = INVALID_ROADTYPE; ///< NOSAVE: Roadtype of this vehicle.
 	VehicleID disaster_vehicle = VehicleID::Invalid(); ///< NOSAVE: Disaster vehicle targetting this vehicle.
@@ -278,6 +296,8 @@ protected: // These functions should not be called outside acceleration code.
 	 */
 	inline uint16_t GetMaxTrackSpeed() const
 	{
+		/* Farm fork: no road inside fields, no road speed limit either. */
+		if (!MayHaveRoad(this->tile)) return 0;
 		return GetRoadTypeInfo(GetRoadType(this->tile, GetRoadTramType(this->roadtype)))->max_speed;
 	}
 

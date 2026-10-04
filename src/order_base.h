@@ -76,6 +76,7 @@ public:
 	void MakeGoToStation(StationID destination);
 	void MakeGoToDepot(DestinationID destination, OrderDepotTypeFlags order, OrderNonStopFlags non_stop_type = OrderNonStopFlag::NonStop, OrderDepotActionFlags action = {}, CargoType cargo = CARGO_NO_REFIT);
 	void MakeGoToWaypoint(StationID destination);
+	void MakeWorkField(StationID destination);
 	void MakeLoading(bool ordered);
 	void MakeLeaveStation();
 	void MakeDummy();
@@ -84,11 +85,11 @@ public:
 
 	/**
 	 * Is this a 'goto' order with a real destination?
-	 * @return True if the type is either #OT_GOTO_WAYPOINT, #OT_GOTO_DEPOT or #OT_GOTO_STATION.
+	 * @return True if the type is either #OT_GOTO_WAYPOINT, #OT_GOTO_DEPOT, #OT_GOTO_STATION or #OT_WORK_FIELD.
 	 */
 	inline bool IsGotoOrder() const
 	{
-		return IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION);
+		return IsType(OT_GOTO_WAYPOINT) || IsType(OT_GOTO_DEPOT) || IsType(OT_GOTO_STATION) || IsType(OT_WORK_FIELD);
 	}
 
 	/**

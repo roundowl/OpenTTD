@@ -56,7 +56,24 @@ enum class FieldTaskAction : uint8_t {
 	End, ///< End marker.
 };
 
+/** What a vehicle inside a field is doing; selects the route it follows. */
+enum class FieldRouteKind : uint8_t {
+	Work, ///< Doing a task, from the entry corner round the field back to it.
+	Backtrack, ///< Driving the work route backwards to the entry corner (full, or orders changed).
+	ToPark, ///< Driving from the entry corner to the service quarter.
+	Parked, ///< Waiting on the service quarter for work.
+	FromPark, ///< Driving from the service quarter to the entry corner.
+};
+
+/** A point a field vehicle drives to, in world pixel coordinates. */
+struct FieldWaypoint {
+	int32_t x = 0; ///< World X coordinate.
+	int32_t y = 0; ///< World Y coordinate.
+	bool work = false; ///< Whether the quarter at this point is worked when the vehicle leaves it.
+};
+
 static const uint FIELD_MAX_TASKS = 32; ///< Maximum length of a field's task plan.
 static const uint FIELD_QUARTER_YIELD = 3; ///< Cargo units one quarter yields at 100%.
+static const uint FIELD_QUARTER_MAX_YIELD = (FIELD_QUARTER_YIELD * 140 + 99) / 100; ///< Most cargo units one quarter can yield (all bonuses).
 
 #endif /* FIELD_TYPE_H */

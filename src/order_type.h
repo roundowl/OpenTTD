@@ -58,6 +58,7 @@ enum OrderType : uint8_t {
 	OT_GOTO_WAYPOINT = 6,
 	OT_CONDITIONAL   = 7,
 	OT_IMPLICIT      = 8,
+	OT_WORK_FIELD    = 9, ///< Farm fork: work on the field whose entry corner belongs to the destination station.
 	OT_END
 };
 

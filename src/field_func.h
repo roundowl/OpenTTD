@@ -15,6 +15,25 @@
 #include "tile_type.h"
 
 struct Window;
+struct Vehicle;
+
+bool IsFieldMachine(const Vehicle *v);
+
+/** What a farm vehicle does at the entry corner of a field. */
+enum class FieldCornerAction : uint8_t {
+	StartWork, ///< Drive a work route.
+	Park, ///< Wait on the service quarter; only field orders and no work anywhere.
+	MoveOn, ///< Advance to the next order and leave.
+	Leave, ///< The current order is elsewhere; just leave.
+};
+
+struct RoadVehicle;
+struct RoadVehFieldWork;
+struct FieldWaypoint;
+std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWork &work);
+bool CanStartFieldWork(const RoadVehicle *v, Field *f, FieldTaskType *task);
+FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f);
+bool CanFieldMachineDo(const Vehicle *v, FieldTaskType type);
 
 CommandCost ClearField(Field *f, TileIndex tile, DoCommandFlags flags);
 CommandCost RemoveFieldRoadStop(TileIndex tile, DoCommandFlags flags);

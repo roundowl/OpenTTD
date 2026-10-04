@@ -40,6 +40,10 @@
 #include "roadveh_cmd.h"
 #include "road_cmd.h"
 #include "newgrf_roadstop.h"
+#include "field_base.h"
+#include "field_func.h"
+#include "cargopacket.h"
+#include "timetable.h"
 
 #include "table/strings.h"
 
@@ -381,6 +385,7 @@ CommandCost CmdTurnRoadVeh(DoCommandFlags flags, VehicleID veh_id)
 			v->breakdown_ctr != 0 ||
 			v->overtaking != 0 ||
 			v->state == RVSB_WORMHOLE ||
+			v->state == RVSB_IN_FIELD ||
 			v->IsInDepot() ||
 			v->current_order.IsType(OT_LOADING)) {
 		return CMD_ERROR;
@@ -1144,6 +1149,308 @@ static bool CanBuildTramTrackOnTile(CompanyID c, TileIndex t, RoadType rt, RoadB
 	return Command<Commands::BuildRoad>::Do(DoCommandFlag::NoWater, t, r, rt, {}, TownID::Invalid()).Succeeded();
 }
 
+
+/* Farm fork: road vehicles working inside fields. */
+
+/**
+ * Put a field vehicle on a new route, starting at its first waypoint.
+ * @param v The vehicle.
+ * @param kind What it is going to do.
+ */
+static void RoadVehFieldSetRoute(RoadVehicle *v, FieldRouteKind kind)
+{
+	v->field_work.kind = kind;
+	v->field_work.step = 0;
+	v->field_work.route = BuildFieldRoute(*Field::Get(v->field_work.field), v->field_work);
+}
+
+/**
+ * Start a work run; pays for fertiliser and spray up front.
+ * @param v The vehicle, at the entry corner.
+ * @param f The field.
+ */
+static void RoadVehFieldStartWork(RoadVehicle *v, Field *f)
+{
+	FieldTaskType task;
+	[[maybe_unused]] bool ok = CanStartFieldWork(v, f, &task);
+	assert(ok);
+	v->field_work.task = task;
+
+	if (task == FieldTaskType::Fertilise || task == FieldTaskType::Spray) {
+		CommandCost cost(ExpensesType::RoadVehRun, GetFieldTreatmentCost(task) * f->CountEligibleQuarters(task));
+		v->profit_this_year -= cost.GetCost() << 8;
+		SubtractMoneyFromCompany(v->owner, cost);
+		SetWindowDirty(WindowClass::VehicleDetails, v->index);
+	}
+	RoadVehFieldSetRoute(v, FieldRouteKind::Work);
+}
+
+/** Move on to the next order, as when passing a waypoint. */
+static void RoadVehFieldAdvanceOrder(RoadVehicle *v)
+{
+	UpdateVehicleTimetable(v, true);
+	v->IncrementImplicitOrderIndex();
+	ProcessOrders(v);
+}
+
+/**
+ * Called when a farm vehicle stops in the bay of a field's entry corner:
+ * enter the field if there is work or it has to wait there.
+ * @param v The vehicle, at the stop frame of the bay.
+ * @param rs The road stop.
+ * @param st The station.
+ * @return True if the vehicle is now inside the field.
+ */
+static bool RoadVehTryEnterField(RoadVehicle *v, RoadStop *rs, const Station *st)
+{
+	if (!v->current_order.IsType(OT_WORK_FIELD) || v->current_order.GetDestination() != st->index) return false;
+	Field *f = Field::GetByCornerTile(v->tile);
+	if (f == nullptr || f->station != st->index) return false;
+
+	FieldCornerAction action = EvaluateFieldCorner(v, f);
+	if (action == FieldCornerAction::MoveOn) {
+		RoadVehFieldAdvanceOrder(v);
+		/* A next order for this same station forgets the visit; we are still here though. */
+		v->last_station_visited = st->index;
+		return false;
+	}
+	if (action == FieldCornerAction::Leave) return false;
+
+	RoadVehFieldWork &w = v->field_work;
+	w.field = f->index;
+	w.bay_trackdir = v->state & RVSB_ROAD_STOP_TRACKDIR_MASK;
+	w.bay_direction = v->direction;
+	w.bay_x = v->x_pos;
+	w.bay_y = v->y_pos;
+	w.advance_order = false;
+
+	rs->Leave(v);
+	v->state = RVSB_IN_FIELD;
+	v->frame = 0;
+	v->path.clear();
+
+	if (action == FieldCornerAction::StartWork) {
+		RoadVehFieldStartWork(v, f);
+	} else {
+		RoadVehFieldSetRoute(v, FieldRouteKind::ToPark);
+	}
+	SetWindowWidgetDirty(WindowClass::VehicleView, v->index, WID_VV_START_STOP);
+	return true;
+}
+
+/**
+ * Put a field vehicle back into the bay of the entry corner, as if it had just arrived there.
+ * The normal road stop logic then loads, starts the next field order or drives off.
+ * @param v The vehicle, at the bay position.
+ * @param f The field.
+ * @return False if no bay is free right now.
+ */
+static bool RoadVehFieldExitToBay(RoadVehicle *v, const Field *f)
+{
+	RoadStop *rs = RoadStop::GetByTile(f->corner, RoadStopType::Truck);
+	RoadVehFieldWork &w = v->field_work;
+
+	v->state = w.bay_trackdir;
+	if (rs->IsEntranceBusy() || !rs->Enter(v)) {
+		v->state = RVSB_IN_FIELD;
+		return false;
+	}
+
+	uint side = to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE;
+	v->frame = _road_stop_stop_frame[v->state - RVSB_IN_ROAD_STOP + side];
+	const RoadDriveEntry &rd = _road_drive_data[GetRoadTramType(v->roadtype)][v->state + side][v->frame];
+	v->x_pos = TileX(f->corner) * TILE_SIZE + (rd.x & 15);
+	v->y_pos = TileY(f->corner) * TILE_SIZE + (rd.y & 15);
+	v->tile = f->corner;
+	v->direction = w.bay_direction;
+	v->cur_speed = 0;
+
+	w.field = FieldID::Invalid();
+	w.route.clear();
+
+	v->UpdatePosition();
+	v->UpdateInclination(true, true);
+	SetWindowWidgetDirty(WindowClass::VehicleView, v->index, WID_VV_START_STOP);
+	return true;
+}
+
+/**
+ * Work the quarter a field vehicle has just left.
+ * @param v The vehicle.
+ * @param f The field.
+ * @param wp Waypoint of the quarter.
+ * @return False if the vehicle is full and turned back instead.
+ */
+static bool RoadVehFieldWorkQuarter(RoadVehicle *v, Field *f, const FieldWaypoint &wp)
+{
+	RoadVehFieldWork &w = v->field_work;
+	if (w.task == FieldTaskType::Harvest && (v->cargo.StoredCount() + FIELD_QUARTER_MAX_YIELD > v->cargo_cap || !CargoPacket::CanAllocateItem())) {
+		/* Full: remember nothing, the unharvested quarters stay ripe. Drive back the way we came. */
+		w.backtrack_from = w.step;
+		w.advance_order = true;
+		RoadVehFieldSetRoute(v, FieldRouteKind::Backtrack);
+		return false;
+	}
+
+	TileIndex tile = TileVirtXY(wp.x, wp.y);
+	uint quarter = ((wp.y & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 2 : 0) | ((wp.x & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 1 : 0);
+	int produced = f->WorkQuarter(tile, quarter, w.task);
+	if (produced > 0) {
+		CargoPacket *cp = CargoPacket::Create(f->station, static_cast<uint16_t>(produced), Source{Source::Invalid, SourceType::Industry});
+		/* The harvest counts as loaded at the field's entry corner, for payment distance. */
+		cp->UpdateLoadingTile(f->corner);
+		v->cargo.Append(cp);
+		SetWindowDirty(WindowClass::VehicleDetails, v->index);
+	}
+	return true;
+}
+
+/**
+ * Handle a field vehicle that reached the last waypoint of its route.
+ * @param v The vehicle.
+ * @param f The field.
+ * @return False if the vehicle cannot move on this tick.
+ */
+static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
+{
+	RoadVehFieldWork &w = v->field_work;
+	switch (w.kind) {
+		case FieldRouteKind::ToPark:
+			w.kind = FieldRouteKind::Parked;
+			[[fallthrough]];
+		case FieldRouteKind::Parked:
+			v->cur_speed = 0;
+			return false;
+
+		case FieldRouteKind::Work:
+			w.advance_order = true;
+			break;
+
+		default:
+			break;
+	}
+
+	/* At the entry corner. */
+	if (w.advance_order) {
+		w.advance_order = false;
+		if (v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station) RoadVehFieldAdvanceOrder(v);
+	}
+
+	switch (EvaluateFieldCorner(v, f)) {
+		case FieldCornerAction::StartWork:
+			RoadVehFieldStartWork(v, f);
+			return true;
+
+		case FieldCornerAction::Park:
+			RoadVehFieldSetRoute(v, FieldRouteKind::ToPark);
+			return true;
+
+		case FieldCornerAction::MoveOn:
+			if (!RoadVehFieldExitToBay(v, f)) break;
+			RoadVehFieldAdvanceOrder(v);
+			return false;
+
+		case FieldCornerAction::Leave:
+			if (!RoadVehFieldExitToBay(v, f)) break;
+			return false;
+	}
+	v->cur_speed = 0;
+	return false;
+}
+
+/**
+ * Move a field vehicle by one unit along its route.
+ * @param v The vehicle.
+ * @param f The field.
+ * @return False if the vehicle cannot move on this tick.
+ */
+static bool RoadVehFieldStep(RoadVehicle *v, Field *f)
+{
+	RoadVehFieldWork &w = v->field_work;
+	if (w.step >= w.route.size()) return RoadVehFieldRouteEnd(v, f);
+
+	const FieldWaypoint &target = w.route[w.step];
+	if (v->x_pos == target.x && v->y_pos == target.y) {
+		/* Arriving here means having left the quarter of the previous waypoint. */
+		if (w.kind == FieldRouteKind::Work && w.step > 0 && w.route[w.step - 1].work) {
+			if (!RoadVehFieldWorkQuarter(v, f, w.route[w.step - 1])) return true;
+		}
+		w.step++;
+		return true;
+	}
+
+	int dx = Clamp(target.x - v->x_pos, -1, 1);
+	int dy = Clamp(target.y - v->y_pos, -1, 1);
+	static const Direction dirs[3][3] = {
+		/* dy = -1        dy = 0         dy = +1 */
+		{Direction::N, Direction::NE, Direction::E}, // dx = -1
+		{Direction::NW, Direction::N, Direction::SE}, // dx = 0
+		{Direction::W, Direction::SW, Direction::S}, // dx = +1
+	};
+	Direction dir = dirs[dx + 1][dy + 1];
+	bool turned = dir != v->direction;
+	if (turned) {
+		v->direction = dir;
+		v->UpdateDeltaXY();
+	}
+
+	v->x_pos += dx;
+	v->y_pos += dy;
+	TileIndex tile = TileVirtXY(v->x_pos, v->y_pos);
+	v->tile = tile;
+	v->UpdatePosition();
+	v->UpdateInclination(true, turned);
+	return true;
+}
+
+/**
+ * Controller for a road vehicle inside a field (#RVSB_IN_FIELD).
+ * @param v The vehicle.
+ * @return Always true.
+ */
+static bool RoadVehFieldController(RoadVehicle *v)
+{
+	RoadVehFieldWork &w = v->field_work;
+	Field *f = Field::GetIfValid(w.field);
+	if (f == nullptr) return true; // Cannot happen: fields with vehicles inside cannot be removed.
+	if (w.route.empty()) w.route = BuildFieldRoute(*f, w);
+
+	bool ordered_here = v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station;
+	if (w.kind == FieldRouteKind::Work && !ordered_here) {
+		/* Orders changed: give up the run and head back to the corner. */
+		w.backtrack_from = w.step > 0 ? w.step - 1 : 0;
+		w.advance_order = false;
+		RoadVehFieldSetRoute(v, FieldRouteKind::Backtrack);
+	}
+
+	if (w.kind == FieldRouteKind::Parked) {
+		v->cur_speed = 0;
+		if ((v->tick_counter & 0x3F) == 0 && EvaluateFieldCorner(v, f) != FieldCornerAction::Park) {
+			RoadVehFieldSetRoute(v, FieldRouteKind::FromPark);
+		}
+		v->SetLastSpeed();
+		return true;
+	}
+
+	v->ShowVisualEffect();
+	int j = v->UpdateSpeed();
+	int adv_spd = v->GetAdvanceDistance();
+	bool blocked = false;
+	while (j >= adv_spd) {
+		j -= adv_spd;
+		if (!RoadVehFieldStep(v, f)) {
+			blocked = true;
+			break;
+		}
+		if (v->state != RVSB_IN_FIELD) break; // Back on the road.
+		adv_spd = v->GetAdvanceDistance();
+	}
+
+	v->SetLastSpeed();
+	if (v->progress == 0) v->progress = blocked ? adv_spd - 1 : j;
+	return true;
+}
+
 bool IndividualRoadVehicleController(RoadVehicle *v, const RoadVehicle *prev)
 {
 	if (v->overtaking != 0)  {
@@ -1530,6 +1837,9 @@ again:
 
 			v->last_station_visited = st->index;
 
+			/* Farm fork: a field order makes the vehicle drive into the field from here. */
+			if (IsBayRoadStopTile(v->tile) && RoadVehTryEnterField(v, rs, st)) return false;
+
 			if (IsDriveThroughStopTile(v->tile) || (v->current_order.IsType(OT_GOTO_STATION) && v->current_order.GetDestination() == st->index)) {
 				RoadVehArrivesAt(v, st);
 				v->BeginLoading();
@@ -1597,6 +1907,8 @@ static bool RoadVehController(RoadVehicle *v)
 	v->HandleLoading();
 
 	if (v->current_order.IsType(OT_LOADING)) return true;
+
+	if (v->state == RVSB_IN_FIELD) return RoadVehFieldController(v);
 
 	if (v->IsInDepot()) {
 		/* Check if we should wait here for unbunching. */

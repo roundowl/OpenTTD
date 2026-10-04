@@ -27,6 +27,8 @@
 #include "order_cmd.h"
 #include "train_cmd.h"
 #include "train.h"
+#include "field_base.h"
+#include "field_func.h"
 
 #include "table/strings.h"
 
@@ -88,6 +90,17 @@ void Order::MakeGoToDepot(DestinationID destination, OrderDepotTypeFlags order, 
 void Order::MakeGoToWaypoint(StationID destination)
 {
 	this->type = OT_GOTO_WAYPOINT;
+	this->flags = 0;
+	this->dest = destination;
+}
+
+/**
+ * Makes this order a 'work on field' order.
+ * @param destination the station whose entry corner leads into the field.
+ */
+void Order::MakeWorkField(StationID destination)
+{
+	this->type = OT_WORK_FIELD;
 	this->flags = 0;
 	this->dest = destination;
 }
@@ -573,6 +586,11 @@ TileIndex Order::GetLocation(const Vehicle *v, bool airport) const
 			if (this->GetDestination() == DepotID::Invalid()) return INVALID_TILE;
 			return (v->type == VehicleType::Aircraft) ? Station::Get(this->GetDestination().ToStationID())->xy : Depot::Get(this->GetDestination().ToDepotID())->xy;
 
+		case OT_WORK_FIELD: {
+			const Field *f = Field::GetByStation(this->GetDestination().ToStationID());
+			return f != nullptr ? f->corner : INVALID_TILE;
+		}
+
 		default:
 			return INVALID_TILE;
 	}
@@ -790,6 +808,21 @@ CommandCost CmdInsertOrder(DoCommandFlags flags, VehicleID veh, VehicleOrderID s
 			 * [non-stop]
 			 * non-stop orders (if any) are only valid for trains and road vehicles */
 			if (new_order.GetNonStopType().Any() && !v->IsGroundVehicle()) return CMD_ERROR;
+			break;
+		}
+
+		case OT_WORK_FIELD: {
+			const Field *f = Field::GetByStation(new_order.GetDestination().ToStationID());
+			if (f == nullptr) return CMD_ERROR;
+			ret = CheckOwnership(f->owner);
+			if (ret.Failed()) return ret;
+			Order plain;
+			plain.MakeWorkField(new_order.GetDestination().ToStationID());
+			if (!plain.Equals(new_order)) return CMD_ERROR;
+
+			for (const Vehicle *u = v->FirstShared(); u != nullptr; u = u->NextShared()) {
+				if (!IsFieldMachine(u)) return CommandCost(STR_ERROR_CAN_T_ADD_ORDER, STR_ERROR_NOT_FARM_MACHINE);
+			}
 			break;
 		}
 
@@ -2036,6 +2069,18 @@ bool UpdateOrderDest(Vehicle *v, const Order *order, int conditional_depth, bool
 		case OT_GOTO_WAYPOINT:
 			v->SetDestTile(Waypoint::Get(order->GetDestination().ToStationID())->xy);
 			return true;
+
+		case OT_WORK_FIELD: {
+			const Field *f = Field::GetByStation(order->GetDestination().ToStationID());
+			if (f != nullptr) {
+				v->SetDestTile(f->corner);
+				return true;
+			}
+			assert(!pbs_look_ahead);
+			UpdateVehicleTimetable(v, true);
+			v->IncrementRealOrderIndex();
+			break;
+		}
 
 		case OT_CONDITIONAL: {
 			assert(!pbs_look_ahead);

@@ -35,6 +35,9 @@
 #include "core/string_consumer.hpp"
 #include "window_func.h"
 
+#include "field_base.h"
+#include "field_func.h"
+#include "field_map.h"
 #include "widgets/order_widget.h"
 
 #include "table/strings.h"
@@ -323,6 +326,10 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 			line = GetString(order->GetNonStopType().Test(OrderNonStopFlag::NonStop) ? STR_ORDER_GO_NON_STOP_TO_WAYPOINT : STR_ORDER_GO_TO_WAYPOINT, order->GetDestination());
 			break;
 
+		case OT_WORK_FIELD:
+			line = GetString(STR_ORDER_WORK_FIELD, order->GetDestination());
+			break;
+
 		case OT_CONDITIONAL:
 			if (order->GetConditionVariable() == OrderConditionVariable::Unconditionally) {
 				line = GetString(STR_ORDER_CONDITIONAL_UNCONDITIONAL, order->GetConditionSkipToOrder() + 1);
@@ -367,6 +374,16 @@ void DrawOrderString(const Vehicle *v, const Order *order, VehicleOrderID order_
 static Order GetOrderCmdFromTile(const Vehicle *v, TileIndex tile)
 {
 	Order order{};
+
+	/* Farm fork: a field tile means work on it for farm machinery, and its station for everyone else. */
+	if (IsTileType(tile, TileType::Field) && IsTileOwner(tile, _local_company)) {
+		const Field *f = Field::GetByTile(tile);
+		if (IsFieldMachine(v)) {
+			order.MakeWorkField(f->station);
+			return order;
+		}
+		tile = f->corner;
+	}
 
 	/* check depot first */
 	if (IsDepotTypeTile(tile, (TransportType)(uint)v->type) && IsTileOwner(tile, _local_company)) {

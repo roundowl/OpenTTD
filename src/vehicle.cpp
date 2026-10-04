@@ -2228,7 +2228,9 @@ void Vehicle::DeleteUnreachedImplicitOrders()
  */
 void Vehicle::BeginLoading()
 {
-	assert(IsTileType(this->GetMovingFront()->tile, TileType::Station) || this->type == VehicleType::Ship);
+	/* Farm fork: farm machinery also loads and unloads on the service quarter inside a field. */
+	assert(IsTileType(this->GetMovingFront()->tile, TileType::Station) || this->type == VehicleType::Ship ||
+			(this->type == VehicleType::Road && RoadVehicle::From(this)->state == RVSB_IN_FIELD));
 
 	TimerGameTick::Ticks travel_time = TimerGameTick::counter - this->last_loading_tick;
 	if (this->current_order.IsType(OT_GOTO_STATION) &&

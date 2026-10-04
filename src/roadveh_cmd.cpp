@@ -1179,7 +1179,17 @@ static void RoadVehFieldStartWork(RoadVehicle *v, Field *f)
 	v->field_work.segment = segment;
 
 	if (task == FieldTaskType::Fertilise || task == FieldTaskType::Spray) {
-		CommandCost cost(ExpensesType::RoadVehRun, GetFieldTreatmentCost(task) * CountFieldSegmentEligibleQuarters(*f, segment, task));
+		uint quarters = CountFieldSegmentEligibleQuarters(*f, segment, task);
+		if (task == FieldTaskType::Fertilise) {
+			/* Fertiliser carried by the machine is used first, one unit per quarter; only the rest is bought. */
+			CargoType fert = GetCargoTypeByLabel(CargoLabel{"FERT"});
+			if (IsValidCargoType(fert) && v->cargo_type == fert) {
+				uint used = v->cargo.Truncate(quarters);
+				quarters -= used;
+				if (used > 0) SetWindowDirty(WindowClass::VehicleDetails, v->index);
+			}
+		}
+		CommandCost cost(ExpensesType::RoadVehRun, GetFieldTreatmentCost(task) * quarters);
 		v->profit_this_year -= cost.GetCost() << 8;
 		SubtractMoneyFromCompany(v->owner, cost);
 		SetWindowDirty(WindowClass::VehicleDetails, v->index);
@@ -1327,6 +1337,18 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 			v->cur_speed = 0;
 			return false;
 
+		case FieldRouteKind::ToService:
+			/* Stop at the field's station from here, keeping the bay free. */
+			w.kind = FieldRouteKind::Servicing;
+			v->cur_speed = 0;
+			v->last_station_visited = f->station;
+			v->BeginLoading();
+			return false;
+
+		case FieldRouteKind::Servicing:
+			v->cur_speed = 0;
+			return false;
+
 		case FieldRouteKind::Work: {
 			/* The quarter we are standing on is the last of the segment. */
 			if (!w.route.empty() && w.route.back().work && !RoadVehFieldWorkQuarter(v, f, w.route.back())) return true;
@@ -1369,11 +1391,15 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 			return true;
 
 		case FieldCornerAction::MoveOn:
-			if (!RoadVehFieldExitToBay(v, f)) break;
 			RoadVehFieldAdvanceOrder(v);
-			return false;
+			[[fallthrough]];
 
 		case FieldCornerAction::Leave:
+			if (v->current_order.IsType(OT_GOTO_STATION) && v->current_order.GetDestination() == f->station) {
+				/* The next stop is this field's own station: use the service quarter, not the bay. */
+				RoadVehFieldSetRoute(v, FieldRouteKind::ToService);
+				return true;
+			}
 			if (!RoadVehFieldExitToBay(v, f)) break;
 			return false;
 	}
@@ -1408,7 +1434,7 @@ static bool IsFieldPathBlocked(const RoadVehicle *v, const Field *f, int dx, int
 	if (v->tile == f->corner) return false;
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (rv == v || rv->state != RVSB_IN_FIELD || rv->field_work.field != f->index) continue;
-		if (rv->field_work.kind == FieldRouteKind::Parked || rv->tile == f->corner) continue;
+		if (rv->field_work.kind == FieldRouteKind::Parked || rv->field_work.kind == FieldRouteKind::Servicing || rv->tile == f->corner) continue;
 
 		int ox = rv->x_pos - v->x_pos;
 		int oy = rv->y_pos - v->y_pos;
@@ -1490,6 +1516,12 @@ static bool RoadVehFieldController(RoadVehicle *v)
 		w.backtrack_from = w.step > 0 ? w.step - 1 : 0;
 		w.advance_order = false;
 		RoadVehFieldSetRoute(v, FieldRouteKind::Backtrack);
+	}
+
+	if (v->current_order.IsType(OT_LEAVESTATION)) v->current_order.Free();
+	if (w.kind == FieldRouteKind::Servicing) {
+		/* Done loading or unloading: back to the corner to see what is next. */
+		RoadVehFieldSetRoute(v, FieldRouteKind::FromPark);
 	}
 
 	if (w.kind == FieldRouteKind::Parked) {

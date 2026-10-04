@@ -64,6 +64,8 @@ enum class FieldRouteKind : uint8_t {
 	Parked, ///< Waiting on the service quarter for work.
 	FromPark, ///< Driving from the service quarter to the entry corner.
 	ToCorner, ///< Driving from the end of a segment to the entry corner.
+	ToService, ///< Driving from the entry corner to the service quarter to load or unload there.
+	Servicing, ///< Loading or unloading on the service quarter, for an order to the field's own station.
 };
 
 /** A point a field vehicle drives to, in world pixel coordinates. */

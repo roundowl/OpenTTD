@@ -318,17 +318,18 @@ static const IntervalTimer<TimerGameEconomy> _economy_fields_monthly({TimerGameE
 
 /**
  * The geometry of a field as seen from its entry corner.
- * A field is a grid of half-tile cells (u, v): u runs along the long side, v along the short side,
+ * A field is a grid of half-tile cells (u, v): u runs along the short side, v along the long side,
  * both pointing away from the entry corner, whose tile holds the cells (0..1, 0..1).
+ * Rows run along u, so they are short and there are many of them for machines to share.
  */
 struct FieldFrame {
 	int x0; ///< World X of the north corner of the entry corner tile.
 	int y0; ///< World Y of the north corner of the entry corner tile.
 	int sx; ///< +1 if the field extends towards higher X from the corner, else -1.
 	int sy; ///< +1 if the field extends towards higher Y from the corner, else -1.
-	bool u_is_x; ///< Whether u runs along world X.
-	int lu; ///< Number of cells along u.
-	int lv; ///< Number of cells along v.
+	bool u_is_x; ///< Whether u (the short side) runs along world X.
+	int lu; ///< Number of cells along u, the short side.
+	int lv; ///< Number of cells along v, the long side.
 
 	explicit FieldFrame(const Field &f)
 	{
@@ -336,7 +337,7 @@ struct FieldFrame {
 		this->y0 = TileY(f.corner) * TILE_SIZE;
 		this->sx = TileX(f.corner) == TileX(f.location.tile) ? 1 : -1;
 		this->sy = TileY(f.corner) == TileY(f.location.tile) ? 1 : -1;
-		this->u_is_x = f.location.w >= f.location.h;
+		this->u_is_x = f.location.w < f.location.h;
 		this->lu = 2 * (this->u_is_x ? f.location.w : f.location.h);
 		this->lv = 2 * (this->u_is_x ? f.location.h : f.location.w);
 	}
@@ -541,6 +542,8 @@ std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWor
 
 		case FieldRouteKind::ToPark:
 		case FieldRouteKind::Parked:
+		case FieldRouteKind::ToService:
+		case FieldRouteKind::Servicing:
 			route.push_back(fr.Centre(1, 1, false));
 			route.push_back(fr.Centre(0, 1, false));
 			route.push_back(fr.Centre(0, 2, false));
@@ -726,6 +729,8 @@ FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f)
 	bool other_field_has_work = false;
 	for (const Order &order : v->Orders()) {
 		if (!order.IsType(OT_WORK_FIELD)) {
+			/* Stopping at a field's station with nothing to unload is no reason to go away. */
+			if (order.IsType(OT_GOTO_STATION) && v->cargo.StoredCount() == 0 && Field::GetByStation(order.GetDestination().ToStationID()) != nullptr) continue;
 			only_fields = false;
 			break;
 		}

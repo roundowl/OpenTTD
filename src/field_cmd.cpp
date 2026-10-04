@@ -21,6 +21,7 @@
 #include "economy_func.h"
 #include "industry_type.h"
 #include "landscape.h"
+#include "settings_type.h"
 #include "landscape_cmd.h"
 #include "newgrf_roadstop.h"
 #include "object_base.h"
@@ -41,6 +42,7 @@
 
 #include "table/strings.h"
 #include "table/sprites.h"
+#include "table/clear_land.h"
 
 #include "safeguards.h"
 
@@ -325,8 +327,13 @@ static void DrawTile_Field(TileInfo *ti)
 {
 	const Field *f = Field::GetByTile(ti->tile);
 
-	for (uint q = 0; q < 4; q++) {
-		DrawGroundSprite(GetFieldQuarterSprite(GetFieldQuarterStage(ti->tile, q), ti->tileh, q), PAL_NONE);
+	uint snow = GetFieldSnow(ti->tile);
+	if (snow > 0) {
+		DrawGroundSprite(_clear_land_sprites_snow_desert[snow - 1] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+	} else {
+		for (uint q = 0; q < 4; q++) {
+			DrawGroundSprite(GetFieldQuarterSprite(GetFieldQuarterStage(ti->tile, q), ti->tileh, q), PAL_NONE);
+		}
 	}
 
 	PaletteID pal = GetCompanyPalette(f->owner);
@@ -356,6 +363,18 @@ static void GetTileDesc_Field(TileIndex tile, TileDesc &td)
 	td.str = STR_LAI_FIELD_DESCRIPTION;
 	td.owner[0] = GetTileOwner(tile);
 	td.build_date = Field::GetByTile(tile)->build_date;
+}
+
+/** @copydoc TileLoopProc */
+static void TileLoop_Field(TileIndex tile)
+{
+	/* Snow comes and goes one step at a time, like on clear land. */
+	bool snowy = (_settings_game.game_creation.landscape == LandscapeType::Arctic || IsSnowLineSet()) && GetTileMaxZ(tile) > GetSnowLine();
+	uint snow = GetFieldSnow(tile);
+	uint target = snowy ? 4 : 0;
+	if (snow == target) return;
+	SetFieldSnow(tile, snow < target ? snow + 1 : snow - 1);
+	MarkTileDirtyByTile(tile);
 }
 
 /** @copydoc ClickTileProc */
@@ -401,7 +420,7 @@ extern const TileTypeProcs _tile_type_field_procs = {
 	.clear_tile_proc = ClearTile_Field,
 	.get_tile_desc_proc = GetTileDesc_Field,
 	.click_tile_proc = ClickTile_Field,
-	.tile_loop_proc = [](TileIndex) {},
+	.tile_loop_proc = TileLoop_Field,
 	.change_tile_owner_proc = ChangeTileOwner_Field,
 	.terraform_tile_proc = TerraformTile_Field,
 	.check_build_above_proc = CheckBuildAbove_Field,

@@ -14,7 +14,8 @@
  *  - m3 bits 0..3: quarter has been fertilised this crop cycle, one bit per quarter
  *  - m3 bits 4..7: quarter has been sprayed this crop cycle, one bit per quarter
  *  - m8: four 4-bit #FieldStage values, one per quarter; quarter index is (y half << 1) | x half
- *  - m4, m5, m6 bits 2..7, m7: unused, zero
+ *  - m5 bits 0..2: snow cover, 0 (none) .. 4 (full); follows the snow line in the tile loop
+ *  - m4, m5 bits 3..7, m6 bits 2..7, m7: unused, zero
  */
 
 #ifndef FIELD_MAP_H
@@ -91,6 +92,30 @@ inline void SetFieldQuarterTreated(Tile t, uint quarter, bool spray, bool treate
 	assert(IsTileType(t, TileType::Field));
 	assert(quarter < 4);
 	AssignBit(t.m3(), quarter + (spray ? 4 : 0), treated);
+}
+
+/**
+ * Get the snow cover of a field tile.
+ * @param t The tile.
+ * @pre IsTileType(t, TileType::Field)
+ * @return 0 for none up to 4 for fully covered.
+ */
+inline uint GetFieldSnow(Tile t)
+{
+	assert(IsTileType(t, TileType::Field));
+	return GB(t.m5(), 0, 3);
+}
+
+/**
+ * Set the snow cover of a field tile.
+ * @param t The tile.
+ * @param snow 0 for none up to 4 for fully covered.
+ * @pre IsTileType(t, TileType::Field)
+ */
+inline void SetFieldSnow(Tile t, uint snow)
+{
+	assert(IsTileType(t, TileType::Field));
+	SB(t.m5(), 0, 3, snow);
 }
 
 /**

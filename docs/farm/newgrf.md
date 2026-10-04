@@ -25,7 +25,7 @@ to sow from all crops available in the climate.
 |---|---|---|---|
 | `08` | D | — | Cargo label produced. Must be set first; defines the crop. |
 | `09` | B | `0F` | Climates: bit 0 temperate, 1 sub-arctic, 2 sub-tropical, 3 toyland |
-| `0A` | B | `01` | Months per growth stage from sown to ripe (1..15). There are four stages; ripe and overripe always last one month each. |
+| `0A` | B | `01` | Months per growth stage from sown to ripe (1..15). There are four stages; the crop then stays ripe for two months and overripe for two more before it withers. |
 | `0B` | B | `03` | Cargo units per quarter at 100%. The baseline is 80%; fertilising and spraying add 20% each. |
 
 A crop is only offered if its cargo exists in the game and the climate matches. When several

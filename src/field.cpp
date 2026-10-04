@@ -235,7 +235,15 @@ void Field::Grow()
 		SetWindowDirty(WindowClass::FieldView, this->index);
 		return;
 	}
-	FieldStage target = (top >= FieldStage::Ripe || grow_stage) ? static_cast<FieldStage>(to_underlying(top) + 1) : top;
+	FieldStage target;
+	if (top >= FieldStage::Ripe) {
+		/* Ripe for two months, overripe for two more, then the crop withers. */
+		this->ripe_age++;
+		target = this->ripe_age >= 4 ? FieldStage::Withered : (this->ripe_age >= 2 ? FieldStage::Overripe : FieldStage::Ripe);
+	} else {
+		this->ripe_age = 0;
+		target = grow_stage ? static_cast<FieldStage>(to_underlying(top) + 1) : top;
+	}
 
 	for (TileIndex tile : this->location) {
 		if (!IsTileType(tile, TileType::Field)) continue;
@@ -661,8 +669,8 @@ static bool IsFieldSegmentReserved(const Field &f, int segment, const RoadVehicl
 
 /**
  * Find a segment a vehicle can work on.
- * The entry strip and the row pair beside the corner come first; the other rows are only handed
- * out once the strip has no work left and nobody is working it.
+ * The entry strip and the row pair beside the corner come first; every other row is handed out
+ * once the strip's inner lane leading to it has been worked.
  * @param v The vehicle.
  * @param f The field.
  * @param type The task.
@@ -675,17 +683,27 @@ static int FindFieldSegment(const RoadVehicle *v, const Field &f, FieldTaskType 
 	int count = GetFieldSegmentCount(fr);
 
 	/* The row pair next to the corner needs no strip lanes and the strip needs none either: both
-	 * are open at once. The other rows are reached over the strip, so they wait until it is done.
-	 * Nearest first. */
-	bool strip_open = IsFieldSegmentReserved(f, 0, v) || CountSegmentEligibleQuarters(f, fr, 0, type) > 0;
+	 * are open at once. The other rows are reached over the strip's inner lane, so a row opens as
+	 * soon as the inner lane up to it has been worked: machines follow the strip machine up the
+	 * field. Nearest first. */
+	auto inner_lane_clear_to = [&](int to_v) {
+		for (int lane_v = 2; lane_v <= to_v; lane_v++) {
+			FieldWaypoint wp = fr.Centre(1, lane_v, false);
+			TileIndex tile = TileVirtXY(wp.x, wp.y);
+			if (!IsTileType(tile, TileType::Field) || GetFieldIndex(tile) != f.index) continue;
+			uint quarter = ((wp.y & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 2 : 0) | ((wp.x & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 1 : 0);
+			if (IsQuarterEligible(type, tile, quarter)) return false;
+		}
+		return true;
+	};
 	std::vector<int> order{1, 0};
 	for (int s = 2; s < count; s++) order.push_back(s);
 
 	busy = false;
 	for (int s : order) {
 		if (CountSegmentEligibleQuarters(f, fr, s, type) == 0) continue;
-		if (s >= 2 && strip_open) {
-			busy = true; // Waiting for the strip.
+		if (s >= 2 && !inner_lane_clear_to(2 * (s - 1))) {
+			busy = true; // Waiting for the strip machine to clear the lane.
 			continue;
 		}
 		if (IsFieldSegmentReserved(f, s, v)) {

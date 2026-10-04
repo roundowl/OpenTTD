@@ -40,6 +40,7 @@ static const SaveLoad _field_desc[] = {
 	SaveLoad::Variable<VarFileType::U8>("crop", SLE_OBJECT_ADDRESS(Field, crop)),
 	SaveLoad::Variable<VarFileType::U8>("planned_crop", SLE_OBJECT_ADDRESS(Field, planned_crop)),
 	SaveLoad::Variable<VarFileType::U8>("growth_counter", SLE_OBJECT_ADDRESS(Field, growth_counter)),
+	SaveLoad::Variable<VarFileType::U8>("ripe_age", SLE_OBJECT_ADDRESS(Field, ripe_age)),
 	SaveLoad::Variable<VarFileType::U16>("harvest_remainder", SLE_OBJECT_ADDRESS(Field, harvest_remainder)),
 	SaveLoad::Variable<VarFileType::U32>("last_harvest", SLE_OBJECT_ADDRESS(Field, last_harvest)),
 	SaveLoad::StructList<SlFieldTasks>("tasks"),

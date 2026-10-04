@@ -101,6 +101,7 @@ enum class GrfSpecFeature : uint8_t {
 	TramTypes, ///< Tram types feature
 	RoadStops, ///< Road stops feature
 	Badges, ///< Badges feature
+	Crops, ///< Crops for player-built farm fields (farm fork)
 	End, ///< End marker
 
 	Default = End, ///< Unspecified feature, default badge
@@ -150,6 +151,7 @@ struct GRFFile {
 
 	std::vector<BadgeID> badge_list{}; ///< Badge translation table (local index -> global index)
 	std::unordered_map<uint16_t, BadgeID> badge_map{};
+	std::vector<uint16_t> crop_map{}; ///< Farm fork: local crop id to index into #_crop_specs, UINT16_MAX if undefined.
 
 	std::vector<RailTypeLabel> railtype_list{}; ///< Railtype translation table
 	std::array<RailType, RAILTYPE_END> railtype_map{};

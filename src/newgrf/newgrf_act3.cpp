@@ -14,6 +14,7 @@
 #include "../newgrf.h"
 #include "../newgrf_engine.h"
 #include "../newgrf_badge.h"
+#include "../newgrf_crop.h"
 #include "../newgrf_badge_type.h"
 #include "../newgrf_cargo.h"
 #include "../newgrf_house.h"
@@ -281,6 +282,21 @@ struct CargoMapSpriteGroupHandler : MapSpriteGroupHandler {
 	}
 };
 
+/** Farm fork: crops take one sprite group each, the quarter graphics. */
+struct CropMapSpriteGroupHandler : MapSpriteGroupHandler {
+	void MapSpecific(uint16_t, uint8_t, const SpriteGroup *) override {}
+
+	void MapDefault(uint16_t local_id, const SpriteGroup *group) override
+	{
+		const auto &map = _cur_gps.grffile->crop_map;
+		if (local_id >= map.size() || map[local_id] == UINT16_MAX) {
+			GrfMsg(Severity::Error, "CropMapSpriteGroup: Crop {} undefined, skipping", local_id);
+			return;
+		}
+		_crop_specs[map[local_id]].group = group;
+	}
+};
+
 template <> auto *GetSpec<ObjectSpec>(GRFFile *grffile, uint16_t local_id) { return local_id < grffile->objectspec.size() ? grffile->objectspec[local_id].get() : nullptr; }
 struct ObjectMapSpriteGroupHandler : PurchaseDefaultMapSpriteGroupHandler<ObjectSpec> {};
 
@@ -450,6 +466,7 @@ static void FeatureMapSpriteGroup(ByteReader &buf)
 		case GrfSpecFeature::AirportTiles: MapSpriteGroup(buf, idcount, AirportTileMapSpriteGroupHandler{}); return;
 		case GrfSpecFeature::RoadStops: MapSpriteGroup(buf, idcount, RoadStopMapSpriteGroupHandler{}); return;
 		case GrfSpecFeature::Badges: MapSpriteGroup(buf, idcount, BadgeMapSpriteGroupHandler{}); return;
+		case GrfSpecFeature::Crops: MapSpriteGroup(buf, idcount, CropMapSpriteGroupHandler{}); return;
 
 		default:
 			GrfMsg(Severity::Error, "FeatureMapSpriteGroup: Unsupported feature 0x{:02X}, skipping", feature);

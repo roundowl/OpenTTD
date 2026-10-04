@@ -53,6 +53,7 @@ enum class FieldTaskAction : uint8_t {
 	SetMonth, ///< Set the earliest start month of the task at \a pos to \a value (0 = any, 1..12).
 	SkipTo, ///< Make the task at \a pos the current task.
 	PerformNow, ///< Test helper: do the current task instantly on every eligible quarter.
+	SetCrop, ///< Sow the crop producing cargo \a value from now on.
 	End, ///< End marker.
 };
 
@@ -77,6 +78,5 @@ struct FieldWaypoint {
 
 static const uint FIELD_MAX_TASKS = 32; ///< Maximum length of a field's task plan.
 static const uint FIELD_QUARTER_YIELD = 3; ///< Cargo units one quarter yields at 100%.
-static const uint FIELD_QUARTER_MAX_YIELD = (FIELD_QUARTER_YIELD * 140 + 99) / 100; ///< Most cargo units one quarter can yield (all bonuses).
 
 #endif /* FIELD_TYPE_H */

@@ -1299,7 +1299,7 @@ static bool RoadVehFieldExitToBay(RoadVehicle *v, const Field *f)
 static bool RoadVehFieldWorkQuarter(RoadVehicle *v, Field *f, const FieldWaypoint &wp)
 {
 	RoadVehFieldWork &w = v->field_work;
-	if (w.task == FieldTaskType::Harvest && (v->cargo.StoredCount() + FIELD_QUARTER_MAX_YIELD > v->cargo_cap || !CargoPacket::CanAllocateItem())) {
+	if (w.task == FieldTaskType::Harvest && (v->cargo.StoredCount() + GetFieldQuarterMaxYield(f->crop) > v->cargo_cap || !CargoPacket::CanAllocateItem())) {
 		/* Full: remember nothing, the unharvested quarters stay ripe. Drive back the way we came. */
 		w.backtrack_from = w.step;
 		w.advance_order = true;

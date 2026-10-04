@@ -51,6 +51,8 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 	uint8_t cur_task = 0; ///< Index into #tasks of the current task.
 	bool cur_task_started = false; ///< Whether any quarter has been worked for the current task.
 	CargoType crop = INVALID_CARGO; ///< Cargo produced by the current or last sown crop.
+	CargoType planned_crop = INVALID_CARGO; ///< Crop to sow next, or #INVALID_CARGO for the climate default.
+	uint8_t growth_counter = 0; ///< Months since the growing quarters last advanced a stage.
 	uint16_t harvest_remainder = 0; ///< Fraction of a cargo unit carried over between harvested quarters, in 1/100.
 	uint32_t last_harvest = 0; ///< Cargo units produced by the most recent harvest run.
 
@@ -81,6 +83,7 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 };
 
 CargoType GetDefaultFieldCrop();
+uint GetFieldQuarterMaxYield(CargoType crop);
 Money GetFieldTreatmentCost(FieldTaskType type);
 
 #endif /* FIELD_BASE_H */

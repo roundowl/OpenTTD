@@ -12,6 +12,7 @@
 #include "field_cmd.h"
 #include "field_func.h"
 #include "field_map.h"
+#include "newgrf_crop.h"
 #include "bridge_map.h"
 #include "clear_map.h"
 #include "command_func.h"
@@ -239,6 +240,13 @@ CommandCost CmdModifyFieldTasks(DoCommandFlags flags, FieldID field_id, FieldTas
 		case FieldTaskAction::PerformNow:
 			return f->PerformCurrentTask(flags);
 
+		case FieldTaskAction::SetCrop: {
+			auto crops = GetAvailableCrops();
+			if (std::ranges::find(crops, static_cast<CargoType>(value)) == crops.end()) return CMD_ERROR;
+			if (flags.Test(DoCommandFlag::Execute)) f->planned_crop = static_cast<CargoType>(value);
+			break;
+		}
+
 		default:
 			return CMD_ERROR;
 	}
@@ -309,17 +317,18 @@ CommandCost ClearField(Field *f, TileIndex tile, DoCommandFlags flags)
 
 /**
  * Get the ground sprite of one quarter of a field tile.
+ * @param base First sprite of the quarter set: the built-in one or a NewGRF crop's.
  * @param stage Growth stage of the quarter.
  * @param tileh Slope of the tile; must not be steep.
  * @param quarter Quarter index, 0..3, (y half << 1) | x half.
  * @return The sprite; the four quarters of a tile are drawn at the same position.
  */
-static SpriteID GetFieldQuarterSprite(FieldStage stage, Slope tileh, uint quarter)
+static SpriteID GetFieldQuarterSprite(SpriteID base, FieldStage stage, Slope tileh, uint quarter)
 {
 	static_assert(to_underlying(FieldStage::End) * FIELD_QUARTER_SLOPE_COUNT * 4 == FIELD_QUARTERS_SPRITE_COUNT);
 	uint slope = SlopeToSpriteOffset(tileh);
 	assert(slope < FIELD_QUARTER_SLOPE_COUNT);
-	return SPR_FIELD_QUARTERS_BASE + (to_underlying(stage) * FIELD_QUARTER_SLOPE_COUNT + slope) * 4 + quarter;
+	return base + (to_underlying(stage) * FIELD_QUARTER_SLOPE_COUNT + slope) * 4 + quarter;
 }
 
 /** @copydoc DrawTileProc */
@@ -331,8 +340,10 @@ static void DrawTile_Field(TileInfo *ti)
 	if (snow > 0) {
 		DrawGroundSprite(_clear_land_sprites_snow_desert[snow - 1] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
 	} else {
+		SpriteID base = GetCropQuarterSpriteBase(GetCropSpec(f->crop));
+		if (base == 0) base = SPR_FIELD_QUARTERS_BASE;
 		for (uint q = 0; q < 4; q++) {
-			DrawGroundSprite(GetFieldQuarterSprite(GetFieldQuarterStage(ti->tile, q), ti->tileh, q), PAL_NONE);
+			DrawGroundSprite(GetFieldQuarterSprite(base, GetFieldQuarterStage(ti->tile, q), ti->tileh, q), PAL_NONE);
 		}
 	}
 

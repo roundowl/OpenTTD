@@ -16,6 +16,7 @@
 #include "field_base.h"
 #include "field_cmd.h"
 #include "field_map.h"
+#include "newgrf_crop.h"
 #include "strings_func.h"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
@@ -250,6 +251,11 @@ struct FieldViewWindow : Window {
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		if (widget == WID_FV_CAPTION) return GetString(STR_FIELD_VIEW_CAPTION, this->GetField()->station);
+		if (widget == WID_FV_SOW) {
+			CargoType crop = this->GetField()->planned_crop;
+			if (!IsValidCargoType(crop)) crop = GetDefaultFieldCrop();
+			return GetString(STR_FIELD_VIEW_SOW, IsValidCargoType(crop) ? CargoSpec::Get(crop)->name : STR_FIELD_VIEW_CROP_NONE);
+		}
 		return this->Window::GetWidgetString(widget, stringid);
 	}
 
@@ -311,7 +317,12 @@ struct FieldViewWindow : Window {
 		tr.top += line;
 		DrawString(tr, GetString(STR_FIELD_VIEW_TREATED, quarters == 0 ? 0 : fertilised * 100 / quarters, quarters == 0 ? 0 : sprayed * 100 / quarters));
 		tr.top += line;
-		DrawString(tr, f->IsGrowthPaused() ? STR_FIELD_VIEW_PAUSED : STR_FIELD_VIEW_GROWING);
+		CargoType growing = IsValidCargoType(f->crop) ? f->crop : (IsValidCargoType(f->planned_crop) ? f->planned_crop : GetDefaultFieldCrop());
+		if (f->IsGrowthPaused()) {
+			DrawString(tr, STR_FIELD_VIEW_PAUSED);
+		} else {
+			DrawString(tr, GetString(STR_FIELD_VIEW_GROWING, GetCropMonthsPerStage(growing), GetCropYield(growing)));
+		}
 		tr.top += line;
 		if (f->last_harvest > 0 && IsValidCargoType(f->crop)) {
 			DrawString(tr, GetString(STR_FIELD_VIEW_LAST_HARVEST, f->crop, f->last_harvest));
@@ -402,6 +413,14 @@ struct FieldViewWindow : Window {
 			case WID_FV_DO_NOW:
 				this->Modify(FieldTaskAction::PerformNow, 0);
 				break;
+
+			case WID_FV_SOW: {
+				DropDownList list;
+				for (CargoType crop : GetAvailableCrops()) list.push_back(MakeDropDownListStringItem(CargoSpec::Get(crop)->name, crop));
+				CargoType current = IsValidCargoType(f->planned_crop) ? f->planned_crop : GetDefaultFieldCrop();
+				if (!list.empty()) ShowDropDownList(this, std::move(list), current, WID_FV_SOW);
+				break;
+			}
 		}
 	}
 
@@ -417,6 +436,10 @@ struct FieldViewWindow : Window {
 
 			case WID_FV_MONTH:
 				if (this->selected >= 0) this->Modify(FieldTaskAction::SetMonth, this->selected, index);
+				break;
+
+			case WID_FV_SOW:
+				this->Modify(FieldTaskAction::SetCrop, 0, index);
 				break;
 		}
 	}
@@ -438,6 +461,7 @@ struct FieldViewWindow : Window {
 		this->SetWidgetDisabledState(WID_FV_ADD, !mine || f->tasks.size() >= FIELD_MAX_TASKS);
 		this->SetWidgetsDisabledState(!mine || !has_sel, WID_FV_DELETE, WID_FV_MONTH, WID_FV_GOTO);
 		this->SetWidgetDisabledState(WID_FV_DO_NOW, !mine);
+		this->SetWidgetDisabledState(WID_FV_SOW, !mine);
 	}
 
 	void OnPaint() override
@@ -462,6 +486,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_field_view_widgets =
 		NWidget(WWT_STICKYBOX, Colours::DarkGreen),
 	EndContainer(),
 	NWidget(WWT_PANEL, Colours::DarkGreen, WID_FV_INFO), SetResize(1, 0), SetFill(1, 0), EndContainer(),
+	NWidget(WWT_DROPDOWN, Colours::DarkGreen, WID_FV_SOW), SetFill(1, 0), SetResize(1, 0), SetToolTip(STR_FIELD_VIEW_SOW_TOOLTIP),
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PANEL, Colours::DarkGreen, WID_FV_TASKS), SetResize(1, 1), SetFill(1, 1), SetScrollbar(WID_FV_SCROLLBAR), SetToolTip(STR_FIELD_VIEW_TASKS_TOOLTIP), EndContainer(),
 		NWidget(NWID_VSCROLLBAR, Colours::DarkGreen, WID_FV_SCROLLBAR),

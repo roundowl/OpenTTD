@@ -225,6 +225,10 @@ static ChangeInfoResult RoadVehicleChangeInfo(uint first, uint last, int prop, B
 				e->badges = ReadBadgeList(buf, GrfSpecFeature::RoadVehicles);
 				break;
 
+			case 0x40: // Farm fork: field tasks, bitmask of FieldTaskType (cultivate 1, sow 2, fertilise 4, spray 8, harvest 16)
+				rvi->field_tasks = buf.ReadByte();
+				break;
+
 			default:
 				ret = CommonVehicleChangeInfo(ei, prop, buf);
 				break;

@@ -24,6 +24,7 @@
 #include "currency_func.h"
 #include "landscape.h"
 #include "newgrf_badge.h"
+#include "newgrf_crop.h"
 #include "newgrf_badge_config.h"
 #include "newgrf_cargo.h"
 #include "newgrf_sound.h"
@@ -251,6 +252,8 @@ Engine *GetNewEngine(const GRFFile *file, VehicleType type, uint16_t internal_id
 
 		if (!e->grf_prop.HasGrfFile()) {
 			e->grf_prop.SetGRFFile(file);
+			/* Farm fork: a NewGRF vehicle taking the slot of original farm machinery does not inherit its field work. */
+			if (type == VehicleType::Road) e->VehInfo<RoadVehicleInfo>().field_tasks = 0;
 			GrfMsg(Severity::Debug1, "Replaced engine at index {} for GRFID {}, type {}, index {}", e->index, FormatArrayAsHex(file->grfid), type, internal_id);
 		}
 
@@ -416,6 +419,7 @@ void ResetNewGRFData()
 	CleanUpGRFTownNames();
 
 	ResetBadges();
+	ResetCrops();
 
 	/* Copy/reset original engine info data */
 	SetupEngines();

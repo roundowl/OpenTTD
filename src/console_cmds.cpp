@@ -615,6 +615,10 @@ static bool ConFarmList(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "    eligible per segment:{}", seg);
 		}
 	}
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		uint8_t tasks = e->VehInfo<RoadVehicleInfo>().field_tasks;
+		if (tasks != 0) IConsolePrint(CC_DEFAULT, "  engine {} ({}): field tasks {:#x}", e->index, GetString(e->info.string_id), tasks);
+	}
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (!rv->IsFrontEngine() || !IsFieldMachine(rv)) continue;
 		IConsolePrint(CC_DEFAULT, "  vehicle {}: {} orders, cur {}, state {:#x}, order type {}, field {}, seg {}, from ({},{}), kind {}, task {}, step {}/{}, cargo {}/{}", rv->unitnumber, rv->GetNumOrders(), rv->cur_real_order_index, rv->state, to_underlying(rv->current_order.GetType()),

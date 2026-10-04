@@ -5,6 +5,7 @@ add_files(
     newgrf_act0_bridges.cpp
     newgrf_act0_canals.cpp
     newgrf_act0_cargo.cpp
+    newgrf_act0_crops.cpp
     newgrf_act0_globalvar.cpp
     newgrf_act0_houses.cpp
     newgrf_act0_industries.cpp

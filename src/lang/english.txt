@@ -3061,7 +3061,7 @@ STR_FIELD_VIEW_GROUND                                           :{BLACK}Ground: 
 STR_FIELD_VIEW_STAGE_COUNT                                      :{STRING} {NUM}
 STR_FIELD_VIEW_TREATED                                          :{BLACK}Fertilised: {WHITE}{NUM}%{BLACK}  Sprayed: {WHITE}{NUM}%
 STR_FIELD_VIEW_PAUSED                                           :{ORANGE}Growth paused: the field is under snow
-STR_FIELD_VIEW_GROWING                                          :{BLACK}Growth: {WHITE}one stage per month
+STR_FIELD_VIEW_GROWING                                          :{BLACK}Growth: {WHITE}{NUM} month{P "" s} per stage, {NUM} per quarter
 STR_FIELD_VIEW_LAST_HARVEST                                     :{BLACK}Last harvest: {WHITE}{CARGO_LONG}
 STR_FIELD_VIEW_LAST_HARVEST_NONE                                :{BLACK}Last harvest: {WHITE}none yet
 STR_FIELD_VIEW_PLAN_EMPTY                                       :{BLACK}No tasks planned. Add some with the button below
@@ -3081,6 +3081,8 @@ STR_FIELD_VIEW_GO_TO                                            :{BLACK}Go to
 STR_FIELD_VIEW_GO_TO_TOOLTIP                                    :{BLACK}Make the selected task the current one
 STR_FIELD_VIEW_DO_NOW                                           :{BLACK}Do now (test)
 STR_FIELD_VIEW_DO_NOW_TOOLTIP                                   :{BLACK}Testing aid until farm machinery exists: do the current task on the whole field instantly
+STR_FIELD_VIEW_SOW                                              :{BLACK}Sow: {STRING}
+STR_FIELD_VIEW_SOW_TOOLTIP                                      :{BLACK}Crop to sow from the next sowing on. NewGRFs can add crops with their own growth time, yield and graphics
 STR_FIELD_VIEW_MONTH_ANY                                        :Any time
 STR_FIELD_TASK_CULTIVATE                                        :Cultivate
 STR_FIELD_TASK_SOW                                              :Sow

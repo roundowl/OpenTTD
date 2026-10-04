@@ -28,6 +28,7 @@ enum FieldViewWidgets : WidgetID {
 	WID_FV_MONTH, ///< Start month dropdown.
 	WID_FV_GOTO, ///< Make the selected task current.
 	WID_FV_DO_NOW, ///< Do the current task instantly (testing aid).
+	WID_FV_SOW, ///< Crop to sow dropdown.
 };
 
 #endif /* WIDGETS_FIELD_WIDGET_H */

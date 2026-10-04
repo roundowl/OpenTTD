@@ -307,6 +307,8 @@ add_files(
     newgrf_class.h
     newgrf_class_func.h
     newgrf_commons.cpp
+    newgrf_crop.cpp
+    newgrf_crop.h
     newgrf_commons.h
     newgrf_config.cpp
     newgrf_config.h

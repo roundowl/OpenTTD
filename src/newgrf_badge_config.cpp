@@ -53,6 +53,7 @@ public:
 		{}, // GrfSpecFeature::TramTypes
 		"badges_roadstops", // GrfSpecFeature::RoadStops
 		{}, // GrfSpecFeature::Badges
+		{}, // GrfSpecFeature::Crops
 	};
 };
 

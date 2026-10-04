@@ -14,6 +14,7 @@
 #include "economy_func.h"
 #include "engine_base.h"
 #include "field_func.h"
+#include "newgrf_crop.h"
 #include "roadveh.h"
 #include "landscape.h"
 #include "settings_type.h"
@@ -39,6 +40,16 @@ CargoType GetDefaultFieldCrop()
 		if (IsValidCargoType(cargo)) return cargo;
 	}
 	return INVALID_CARGO;
+}
+
+/**
+ * Most cargo units one quarter of a crop can yield, with every bonus.
+ * @param crop The crop's cargo.
+ * @return Rounded up yield at 140%.
+ */
+uint GetFieldQuarterMaxYield(CargoType crop)
+{
+	return (GetCropYield(crop) * 140 + 99) / 100;
 }
 
 /**
@@ -205,12 +216,17 @@ void Field::Grow()
 		return;
 	}
 
+	/* Crops may take several months per growth stage; ripe crops always wither on the same schedule. */
+	bool grow_stage = ++this->growth_counter >= GetCropMonthsPerStage(this->crop);
+	if (grow_stage) this->growth_counter = 0;
+
 	for (TileIndex tile : this->location) {
 		if (!IsTileType(tile, TileType::Field)) continue;
 		bool changed = false;
 		for (uint q = 0; q < 4; q++) {
 			FieldStage stage = GetFieldQuarterStage(tile, q);
 			if (stage < FieldStage::Sown || stage > FieldStage::Overripe) continue;
+			if (stage < FieldStage::Ripe && !grow_stage) continue;
 			SetFieldQuarterStage(tile, q, static_cast<FieldStage>(to_underlying(stage) + 1));
 			changed = true;
 		}
@@ -267,7 +283,8 @@ int Field::WorkQuarter(TileIndex tile, uint quarter, FieldTaskType type)
 	if (!IsTileType(tile, TileType::Field) || GetFieldIndex(tile) != this->index) return -1;
 	if (!IsQuarterEligible(type, tile, quarter)) return -1;
 
-	if (type == FieldTaskType::Harvest && !this->cur_task_started) this->last_harvest = 0;
+	bool first_quarter = !this->cur_task_started;
+	if (type == FieldTaskType::Harvest && first_quarter) this->last_harvest = 0;
 	this->cur_task_started = true;
 
 	int produced = 0;
@@ -280,7 +297,12 @@ int Field::WorkQuarter(TileIndex tile, uint quarter, FieldTaskType type)
 
 		case FieldTaskType::Sow:
 			SetFieldQuarterStage(tile, quarter, FieldStage::Sown);
-			this->crop = GetDefaultFieldCrop();
+			if (first_quarter || !IsValidCargoType(this->crop)) {
+				/* The planned crop, if it can still be sown here; else the climate default. */
+				auto crops = GetAvailableCrops();
+				bool planned_ok = std::ranges::find(crops, this->planned_crop) != crops.end();
+				this->crop = planned_ok ? this->planned_crop : GetDefaultFieldCrop();
+			}
 			break;
 
 		case FieldTaskType::Fertilise:
@@ -291,7 +313,7 @@ int Field::WorkQuarter(TileIndex tile, uint quarter, FieldTaskType type)
 		case FieldTaskType::Harvest: {
 			if (GetFieldQuarterStage(tile, quarter) != FieldStage::Withered) {
 				uint percent = 80 + (IsFieldQuarterTreated(tile, quarter, false) ? 20 : 0) + (IsFieldQuarterTreated(tile, quarter, true) ? 20 : 0);
-				uint points = FIELD_QUARTER_YIELD * percent + this->harvest_remainder;
+				uint points = GetCropYield(this->crop) * percent + this->harvest_remainder;
 				produced = points / 100;
 				this->harvest_remainder = points % 100;
 				this->last_harvest += produced;
@@ -695,7 +717,7 @@ FieldWorkAvailability CanStartFieldWork(const RoadVehicle *v, Field *f, FieldTas
 	if (!CanFieldMachineDo(v, type)) return FieldWorkAvailability::None;
 	if (type == FieldTaskType::Harvest) {
 		if (!IsValidCargoType(f->crop) || v->cargo_type != f->crop) return FieldWorkAvailability::None;
-		if (v->cargo.StoredCount() + FIELD_QUARTER_MAX_YIELD > v->cargo_cap) return FieldWorkAvailability::None;
+		if (v->cargo.StoredCount() + GetFieldQuarterMaxYield(f->crop) > v->cargo_cap) return FieldWorkAvailability::None;
 	}
 
 	bool busy;

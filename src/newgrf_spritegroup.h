@@ -254,9 +254,9 @@ struct ResultSpriteGroup : SpecializedSpriteGroup<ResultSpriteGroup> {
 	 * @param sprite The sprite number.
 	 * @param num_sprites The number of sprites per set.
 	 */
-	ResultSpriteGroup(SpriteGroupID index, SpriteID sprite, uint8_t num_sprites) : SpecializedSpriteGroup<ResultSpriteGroup>(index), num_sprites(num_sprites), sprite(sprite) {}
+	ResultSpriteGroup(SpriteGroupID index, SpriteID sprite, uint16_t num_sprites) : SpecializedSpriteGroup<ResultSpriteGroup>(index), num_sprites(num_sprites), sprite(sprite) {}
 
-	uint8_t num_sprites = 0;
+	uint16_t num_sprites = 0; // farm fork: 16 bits for sets larger than 255 sprites
 	SpriteID sprite = 0;
 
 protected:

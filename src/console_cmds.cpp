@@ -682,6 +682,12 @@ static bool ConFarmList(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "  vehicle {}: {} orders, cur {}, state {:#x}, order type {}, field {}, seg {}, from ({},{}), kind {}, task {}, step {}/{}, cargo {}/{}", rv->unitnumber, rv->GetNumOrders(), rv->cur_real_order_index, rv->state, to_underlying(rv->current_order.GetType()),
 				rv->state == RVSB_IN_FIELD ? static_cast<int>(rv->field_work.field.base()) : -1, rv->field_work.segment, rv->field_work.from_u, rv->field_work.from_v, to_underlying(rv->field_work.kind), to_underlying(rv->field_work.task),
 				rv->field_work.step, rv->field_work.route.size(), rv->cargo.StoredCount(), rv->cargo_cap);
+		std::string orders;
+		for (const Order &o : rv->Orders()) {
+			orders += fmt::format(" [type {} dest {} unload {} load {}]", to_underlying(o.GetType()), o.GetDestination().value,
+					o.IsType(OT_GOTO_STATION) ? to_underlying(o.GetUnloadType()) : 0, o.IsType(OT_GOTO_STATION) ? to_underlying(o.GetLoadType()) : 0);
+		}
+		IConsolePrint(CC_DEFAULT, "    orders:{}", orders);
 	}
 	return true;
 }

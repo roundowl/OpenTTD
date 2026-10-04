@@ -220,14 +220,30 @@ void Field::Grow()
 	bool grow_stage = ++this->growth_counter >= GetCropMonthsPerStage(this->crop);
 	if (grow_stage) this->growth_counter = 0;
 
+	/* The whole crop grows as one: every growing quarter takes the stage of the most advanced one,
+	 * however recently it was sown, so a field ripens all at once. */
+	FieldStage top = FieldStage::End;
+	for (TileIndex tile : this->location) {
+		if (!IsTileType(tile, TileType::Field)) continue;
+		for (uint q = 0; q < 4; q++) {
+			FieldStage stage = GetFieldQuarterStage(tile, q);
+			if (stage < FieldStage::Sown || stage > FieldStage::Overripe) continue;
+			if (top == FieldStage::End || stage > top) top = stage;
+		}
+	}
+	if (top == FieldStage::End) {
+		SetWindowDirty(WindowClass::FieldView, this->index);
+		return;
+	}
+	FieldStage target = (top >= FieldStage::Ripe || grow_stage) ? static_cast<FieldStage>(to_underlying(top) + 1) : top;
+
 	for (TileIndex tile : this->location) {
 		if (!IsTileType(tile, TileType::Field)) continue;
 		bool changed = false;
 		for (uint q = 0; q < 4; q++) {
 			FieldStage stage = GetFieldQuarterStage(tile, q);
-			if (stage < FieldStage::Sown || stage > FieldStage::Overripe) continue;
-			if (stage < FieldStage::Ripe && !grow_stage) continue;
-			SetFieldQuarterStage(tile, q, static_cast<FieldStage>(to_underlying(stage) + 1));
+			if (stage < FieldStage::Sown || stage > FieldStage::Overripe || stage == target) continue;
+			SetFieldQuarterStage(tile, q, target);
 			changed = true;
 		}
 		if (changed) MarkTileDirtyByTile(tile);
@@ -749,6 +765,16 @@ bool IsFieldMachineIdle(const RoadVehicle *v)
 }
 
 /**
+ * Does a vehicle have any order to stop at a station, i.e. somewhere to deliver cargo?
+ * @param v The vehicle.
+ * @return True if so.
+ */
+bool HasStationOrder(const Vehicle *v)
+{
+	return std::ranges::any_of(v->Orders(), [](const Order &o) { return o.IsType(OT_GOTO_STATION); });
+}
+
+/**
  * Decide what a farm vehicle does at the entry corner of a field.
  * Does not change any vehicle state.
  * @param v The vehicle.
@@ -764,6 +790,9 @@ FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f)
 		case FieldWorkAvailability::Busy: return FieldCornerAction::Park; // Wait for the other machines.
 		case FieldWorkAvailability::None: break;
 	}
+
+	/* A load with nowhere to go in the orders is delivered to this field's own station. */
+	if (v->cargo.StoredCount() > 0 && !HasStationOrder(v)) return FieldCornerAction::Unload;
 
 	/* Nothing to do here. With other kinds of orders, carry on with them. */
 	bool only_fields = true;

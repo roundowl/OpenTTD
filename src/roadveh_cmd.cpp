@@ -1246,6 +1246,9 @@ static bool RoadVehTryEnterField(RoadVehicle *v, RoadStop *rs, const Station *st
 
 	if (action == FieldCornerAction::StartWork) {
 		RoadVehFieldStartWork(v, f);
+	} else if (action == FieldCornerAction::Unload) {
+		w.auto_unload = true;
+		RoadVehFieldSetRoute(v, FieldRouteKind::ToService);
 	} else {
 		RoadVehFieldSetRoute(v, FieldRouteKind::ToPark);
 	}
@@ -1300,9 +1303,10 @@ static bool RoadVehFieldWorkQuarter(RoadVehicle *v, Field *f, const FieldWaypoin
 {
 	RoadVehFieldWork &w = v->field_work;
 	if (w.task == FieldTaskType::Harvest && (v->cargo.StoredCount() + GetFieldQuarterMaxYield(f->crop) > v->cargo_cap || !CargoPacket::CanAllocateItem())) {
-		/* Full: remember nothing, the unharvested quarters stay ripe. Drive back the way we came. */
+		/* Full: remember nothing, the unharvested quarters stay ripe. Drive back the way we came,
+		 * then on to the next order, or unload at this field if the orders have no stop for it. */
 		w.backtrack_from = w.step;
-		w.advance_order = true;
+		w.advance_order = HasStationOrder(v);
 		RoadVehFieldSetRoute(v, FieldRouteKind::Backtrack);
 		return false;
 	}
@@ -1341,6 +1345,13 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 			/* Stop at the field's station from here, keeping the bay free. */
 			w.kind = FieldRouteKind::Servicing;
 			v->cur_speed = 0;
+			if (w.auto_unload) {
+				/* Not an order of the vehicle: hand the harvest over to the station for others to collect. */
+				v->current_order.MakeGoToStation(f->station);
+				v->current_order.SetUnloadType(OrderUnloadType::Transfer);
+				v->current_order.SetLoadType(OrderLoadType::NoLoad);
+				w.auto_unload = false;
+			}
 			v->last_station_visited = f->station;
 			v->BeginLoading();
 			return false;
@@ -1385,6 +1396,11 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 
 		case FieldCornerAction::Park:
 			RoadVehFieldSetRoute(v, FieldRouteKind::ToPark);
+			return true;
+
+		case FieldCornerAction::Unload:
+			w.auto_unload = true;
+			RoadVehFieldSetRoute(v, FieldRouteKind::ToService);
 			return true;
 
 		case FieldCornerAction::MoveOn:

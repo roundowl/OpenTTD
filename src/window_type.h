@@ -380,6 +380,12 @@ enum class WindowClass : uint16_t {
 	IndustryView,
 
 	/**
+	 * Farm field view; %Window numbers:
+	 *   - #FieldID = #FieldViewWidgets
+	 */
+	FieldView,
+
+	/**
 	 * Company view; %Window numbers:
 	 *   - #CompanyID = #CompanyWidgets
 	 */

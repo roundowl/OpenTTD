@@ -12,7 +12,9 @@
 
 #include "core/pool_type.hpp"
 #include "field_type.h"
+#include "cargo_type.h"
 #include "company_type.h"
+#include "command_type.h"
 #include "station_type.h"
 #include "tilearea_orthogonal.h"
 #include "timer/timer_game_calendar.h"
@@ -32,11 +34,51 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 	StationID station = StationID::Invalid(); ///< Station the entry corner belongs to.
 	TimerGameCalendar::Date build_date{}; ///< Date of construction.
 
+	/** One step of the field's work plan. */
+	struct Task {
+		FieldTaskType type = FieldTaskType::Cultivate; ///< What to do.
+		uint8_t start_month = 0; ///< Earliest calendar month to start, 1..12, or 0 for any time.
+	};
+
+	/** Whether a task can be worked on. */
+	enum class TaskState : uint8_t {
+		Available, ///< Some quarters can be worked on right now.
+		Waiting, ///< Nothing to do yet, but there will be: crops still growing, or before the start month.
+		Done, ///< Nothing left to do; the plan moves on.
+	};
+
+	std::vector<Task> tasks; ///< The work plan, worked through cyclically.
+	uint8_t cur_task = 0; ///< Index into #tasks of the current task.
+	bool cur_task_started = false; ///< Whether any quarter has been worked for the current task.
+	CargoType crop = INVALID_CARGO; ///< Cargo produced by the current or last sown crop.
+	uint16_t harvest_remainder = 0; ///< Fraction of a cargo unit carried over between harvested quarters, in 1/100.
+	uint32_t last_harvest = 0; ///< Cargo units produced by the most recent harvest run.
+
 	Field(FieldID index) : FieldPool::PoolItem<&_field_pool>(index) {}
 	~Field() {}
+
+	TaskState GetTaskState(uint index) const;
+	uint FindActiveTask() const;
+	void UpdateCurrentTask();
+	bool IsGrowthPaused() const;
+	void Grow();
+	uint CountEligibleQuarters(FieldTaskType type) const;
+	CommandCost PerformCurrentTask(DoCommandFlags flags);
+
+	/**
+	 * Get the current task, if the plan has any.
+	 * @return The current task or \c nullptr.
+	 */
+	const Task *GetCurrentTask() const
+	{
+		return this->cur_task < this->tasks.size() ? &this->tasks[this->cur_task] : nullptr;
+	}
 
 	static Field *GetByTile(TileIndex tile);
 	static Field *GetByCornerTile(TileIndex tile);
 };
+
+CargoType GetDefaultFieldCrop();
+Money GetFieldTreatmentCost(FieldTaskType type);
 
 #endif /* FIELD_BASE_H */

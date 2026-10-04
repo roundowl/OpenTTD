@@ -186,6 +186,7 @@ add_files(
     error.cpp
     error_func.h
     error_gui.cpp
+    field.cpp
     field_base.h
     field_cmd.cpp
     field_cmd.h

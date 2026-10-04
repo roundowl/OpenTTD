@@ -16,4 +16,18 @@ enum FarmToolbarWidgets : WidgetID {
 	WID_FT_DEMOLISH, ///< Demolish button.
 };
 
+/** Widgets of the #FieldViewWindow class. */
+enum FieldViewWidgets : WidgetID {
+	WID_FV_CAPTION, ///< Caption of the window.
+	WID_FV_LOCATION, ///< Centre the main view on the field.
+	WID_FV_INFO, ///< Field status text.
+	WID_FV_TASKS, ///< Task list.
+	WID_FV_SCROLLBAR, ///< Scrollbar of the task list.
+	WID_FV_ADD, ///< Add task dropdown.
+	WID_FV_DELETE, ///< Delete selected task.
+	WID_FV_MONTH, ///< Start month dropdown.
+	WID_FV_GOTO, ///< Make the selected task current.
+	WID_FV_DO_NOW, ///< Do the current task instantly (testing aid).
+};
+
 #endif /* WIDGETS_FIELD_WIDGET_H */

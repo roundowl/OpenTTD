@@ -11,8 +11,10 @@
  * Layout of a #TileType::Field tile:
  *  - m1 bits 0..4: owner
  *  - m2: #FieldID
+ *  - m3 bits 0..3: quarter has been fertilised this crop cycle, one bit per quarter
+ *  - m3 bits 4..7: quarter has been sprayed this crop cycle, one bit per quarter
  *  - m8: four 4-bit #FieldStage values, one per quarter; quarter index is (y half << 1) | x half
- *  - m3, m4, m5, m6 bits 2..7, m7: unused, zero
+ *  - m4, m5, m6 bits 2..7, m7: unused, zero
  */
 
 #ifndef FIELD_MAP_H
@@ -59,6 +61,36 @@ inline void SetFieldQuarterStage(Tile t, uint quarter, FieldStage stage)
 	assert(IsTileType(t, TileType::Field));
 	assert(quarter < 4);
 	SB(t.m8(), quarter * 4, 4, to_underlying(stage));
+}
+
+/**
+ * Has a quarter of a field tile received a yield treatment this crop cycle?
+ * @param t The tile.
+ * @param quarter Quarter index, 0..3.
+ * @param spray False for fertiliser, true for spraying.
+ * @pre IsTileType(t, TileType::Field)
+ * @return True if treated.
+ */
+inline bool IsFieldQuarterTreated(Tile t, uint quarter, bool spray)
+{
+	assert(IsTileType(t, TileType::Field));
+	assert(quarter < 4);
+	return HasBit(t.m3(), quarter + (spray ? 4 : 0));
+}
+
+/**
+ * Mark a quarter of a field tile as treated, or clear the mark.
+ * @param t The tile.
+ * @param quarter Quarter index, 0..3.
+ * @param spray False for fertiliser, true for spraying.
+ * @param treated The new state.
+ * @pre IsTileType(t, TileType::Field)
+ */
+inline void SetFieldQuarterTreated(Tile t, uint quarter, bool spray, bool treated)
+{
+	assert(IsTileType(t, TileType::Field));
+	assert(quarter < 4);
+	AssignBit(t.m3(), quarter + (spray ? 4 : 0), treated);
 }
 
 /**

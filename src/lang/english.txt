@@ -3052,6 +3052,51 @@ STR_TOOLBAR_AIRCRAFT_BUILD_AIRPORT_TOOLTIP                      :{BLACK}Build ai
 STR_TOOLBAR_FARM_CAPTION                                        :{WHITE}Farming
 STR_TOOLBAR_FARM_BUILD_FIELD_TOOLTIP                            :{BLACK}Build a field. Start dragging on the corner that becomes the field entrance: a lorry bay that faces the adjacent road. Fields are 2x2 to 16x16 tiles. Also press Shift to show cost estimate only
 
+# Field view
+STR_FIELD_VIEW_CAPTION                                          :{WHITE}{STATION} field
+STR_FIELD_VIEW_SIZE                                             :{BLACK}Size: {WHITE}{NUM} x {NUM} tiles, {NUM} growing quarters
+STR_FIELD_VIEW_CROP                                             :{BLACK}Crop: {WHITE}{STRING}
+STR_FIELD_VIEW_CROP_NONE                                        :none
+STR_FIELD_VIEW_GROUND                                           :{BLACK}Ground: {WHITE}{RAW_STRING}
+STR_FIELD_VIEW_STAGE_COUNT                                      :{STRING} {NUM}
+STR_FIELD_VIEW_TREATED                                          :{BLACK}Fertilised: {WHITE}{NUM}%{BLACK}  Sprayed: {WHITE}{NUM}%
+STR_FIELD_VIEW_PAUSED                                           :{ORANGE}Growth paused: the field is under snow
+STR_FIELD_VIEW_GROWING                                          :{BLACK}Growth: {WHITE}one stage per month
+STR_FIELD_VIEW_LAST_HARVEST                                     :{BLACK}Last harvest: {WHITE}{CARGO_LONG}
+STR_FIELD_VIEW_LAST_HARVEST_NONE                                :{BLACK}Last harvest: {WHITE}none yet
+STR_FIELD_VIEW_PLAN_EMPTY                                       :{BLACK}No tasks planned. Add some with the button below
+STR_FIELD_VIEW_TASK_ROW                                         :{COMMA}. {STRING}
+STR_FIELD_VIEW_TASK_ROW_MONTH                                   :{COMMA}. {STRING}, starting in {STRING}
+STR_FIELD_VIEW_TASK_AVAILABLE                                   :{GREEN}(ready)
+STR_FIELD_VIEW_TASK_WAITING                                     :{YELLOW}(waiting)
+STR_FIELD_VIEW_TASK_DONE                                        :{SILVER}(nothing to do)
+STR_FIELD_VIEW_TASKS_TOOLTIP                                    :{BLACK}Work plan, done in order and then repeated. The current task is marked white. Click to select a task
+STR_FIELD_VIEW_ADD_TASK                                         :{BLACK}Add task
+STR_FIELD_VIEW_ADD_TASK_TOOLTIP                                 :{BLACK}Insert a task before the selected one, or at the end if none is selected
+STR_FIELD_VIEW_DELETE_TASK                                      :{BLACK}Delete
+STR_FIELD_VIEW_DELETE_TASK_TOOLTIP                              :{BLACK}Delete the selected task
+STR_FIELD_VIEW_START_MONTH                                      :{BLACK}Start month
+STR_FIELD_VIEW_START_MONTH_TOOLTIP                              :{BLACK}Let the selected task start only in the chosen month. Once started, it is finished whatever the date
+STR_FIELD_VIEW_GO_TO                                            :{BLACK}Go to
+STR_FIELD_VIEW_GO_TO_TOOLTIP                                    :{BLACK}Make the selected task the current one
+STR_FIELD_VIEW_DO_NOW                                           :{BLACK}Do now (test)
+STR_FIELD_VIEW_DO_NOW_TOOLTIP                                   :{BLACK}Testing aid until farm machinery exists: do the current task on the whole field instantly
+STR_FIELD_VIEW_MONTH_ANY                                        :Any time
+STR_FIELD_TASK_CULTIVATE                                        :Cultivate
+STR_FIELD_TASK_SOW                                              :Sow
+STR_FIELD_TASK_FERTILISE                                        :Fertilise
+STR_FIELD_TASK_SPRAY                                            :Spray
+STR_FIELD_TASK_HARVEST                                          :Harvest
+STR_FIELD_STAGE_FALLOW                                          :fallow
+STR_FIELD_STAGE_CULTIVATED                                      :cultivated
+STR_FIELD_STAGE_SOWN                                            :sown
+STR_FIELD_STAGE_SPROUTED                                        :sprouted
+STR_FIELD_STAGE_GROWING                                         :growing
+STR_FIELD_STAGE_MATURING                                        :maturing
+STR_FIELD_STAGE_RIPE                                            :ripe
+STR_FIELD_STAGE_OVERRIPE                                        :overripe
+STR_FIELD_STAGE_WITHERED                                        :withered
+
 # Airport construction window
 STR_STATION_BUILD_AIRPORT_CAPTION                               :{WHITE}Airport Selection
 STR_STATION_BUILD_AIRPORT_TOOLTIP                               :{BLACK}Select size/type of airport
@@ -5408,6 +5453,10 @@ STR_ERROR_MUST_REMOVE_FIELD_FIRST                               :must remove the
 STR_ERROR_FIELD_TOO_SMALL                                       :field must be at least 2x2 tiles
 STR_ERROR_FIELD_TOO_LARGE                                       :field sides must be at most 16 tiles
 STR_ERROR_TOO_MANY_FIELDS                                       :too many farm fields
+STR_ERROR_FIELD_NOTHING_TO_DO                                   :nothing to do on this field right now
+STR_ERROR_FIELD_TOO_MANY_TASKS                                  :too many tasks in the plan
+STR_ERROR_CAN_T_MODIFY_FIELD_PLAN                               :Can't change the field plan...
+STR_ERROR_CAN_T_DO_FIELD_TASK                                   :Can't do the field task...
 STR_ERROR_COMPANY_HEADQUARTERS_IN                               :company headquarters in the way
 STR_ERROR_CAN_T_PURCHASE_THIS_LAND                              :Can't purchase this land area...
 STR_ERROR_YOU_ALREADY_OWN_IT                                    :you already own it!

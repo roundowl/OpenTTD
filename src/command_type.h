@@ -212,6 +212,7 @@ enum class Commands : uint8_t {
 	BuildObject, ///< build an object
 	BuildObjectArea, ///< build an area of objects
 	BuildField, ///< build a farm field
+	ModifyFieldTasks, ///< change the work plan of a farm field
 	BuildTunnel, ///< build a tunnel
 
 	RemoveFromRailStation, ///< remove a (rectangle of) tiles from a rail station

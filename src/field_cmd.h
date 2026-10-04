@@ -12,9 +12,12 @@
 
 #include "command_type.h"
 #include "road_type.h"
+#include "field_type.h"
 
 CommandCost CmdBuildField(DoCommandFlags flags, TileIndex tile, TileIndex start_tile, RoadType rt);
+CommandCost CmdModifyFieldTasks(DoCommandFlags flags, FieldID field_id, FieldTaskAction action, uint8_t pos, uint8_t value);
 
 DEF_CMD_TRAIT(Commands::BuildField, CmdBuildField, CommandFlags({CommandFlag::NoWater, CommandFlag::Auto}), CommandType::LandscapeConstruction)
+DEF_CMD_TRAIT(Commands::ModifyFieldTasks, CmdModifyFieldTasks, {}, CommandType::OtherManagement)
 
 #endif /* FIELD_CMD_H */

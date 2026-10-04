@@ -33,6 +33,7 @@
 #include "station_map.h"
 #include "vehicle_func.h"
 #include "viewport_func.h"
+#include "window_func.h"
 #include "timer/timer_game_calendar.h"
 
 #include "table/strings.h"
@@ -146,6 +147,7 @@ CommandCost CmdBuildField(DoCommandFlags flags, TileIndex tile, TileIndex start_
 		f->corner = start_tile;
 		f->station = GetStationIndex(start_tile);
 		f->build_date = TimerGameCalendar::date;
+		f->tasks = {{FieldTaskType::Cultivate}, {FieldTaskType::Sow}, {FieldTaskType::Harvest}};
 
 		for (TileIndex cur_tile : area) {
 			if (cur_tile == start_tile) continue;
@@ -158,12 +160,82 @@ CommandCost CmdBuildField(DoCommandFlags flags, TileIndex tile, TileIndex start_
 }
 
 /**
+ * Change the work plan of a field.
+ * @param flags Operation to perform.
+ * @param field_id The field.
+ * @param action What to change.
+ * @param pos Position in the plan the action refers to.
+ * @param value Task type for #FieldTaskAction::Insert, month for #FieldTaskAction::SetMonth.
+ * @return The cost of this operation or an error.
+ */
+CommandCost CmdModifyFieldTasks(DoCommandFlags flags, FieldID field_id, FieldTaskAction action, uint8_t pos, uint8_t value)
+{
+	Field *f = Field::GetIfValid(field_id);
+	if (f == nullptr) return CMD_ERROR;
+	CommandCost ret = CheckOwnership(f->owner);
+	if (ret.Failed()) return ret;
+
+	switch (action) {
+		case FieldTaskAction::Insert:
+			if (pos > f->tasks.size() || value >= to_underlying(FieldTaskType::End)) return CMD_ERROR;
+			if (f->tasks.size() >= FIELD_MAX_TASKS) return CommandCost(STR_ERROR_FIELD_TOO_MANY_TASKS);
+			if (flags.Test(DoCommandFlag::Execute)) {
+				f->tasks.insert(f->tasks.begin() + pos, Field::Task{static_cast<FieldTaskType>(value)});
+				if (pos <= f->cur_task && f->tasks.size() > 1) f->cur_task++;
+			}
+			break;
+
+		case FieldTaskAction::Delete:
+			if (pos >= f->tasks.size()) return CMD_ERROR;
+			if (flags.Test(DoCommandFlag::Execute)) {
+				f->tasks.erase(f->tasks.begin() + pos);
+				if (pos < f->cur_task) {
+					f->cur_task--;
+				} else if (pos == f->cur_task) {
+					f->cur_task_started = false;
+				}
+			}
+			break;
+
+		case FieldTaskAction::SetMonth:
+			if (pos >= f->tasks.size() || value > 12) return CMD_ERROR;
+			if (flags.Test(DoCommandFlag::Execute)) f->tasks[pos].start_month = value;
+			break;
+
+		case FieldTaskAction::SkipTo:
+			if (pos >= f->tasks.size()) return CMD_ERROR;
+			if (flags.Test(DoCommandFlag::Execute)) {
+				f->cur_task = pos;
+				f->cur_task_started = false;
+			}
+			break;
+
+		case FieldTaskAction::PerformNow:
+			return f->PerformCurrentTask(flags);
+
+		default:
+			return CMD_ERROR;
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		/* A plan edit must not skip over tasks right away, only clamp the index. */
+		if (f->cur_task >= f->tasks.size()) {
+			f->cur_task = 0;
+			f->cur_task_started = false;
+		}
+		SetWindowDirty(WindowClass::FieldView, f->index);
+	}
+	return CommandCost();
+}
+
+/**
  * Remove a field from the map; its growing tiles revert to ordinary farmland.
  * The truck stop at the entry corner is not touched.
  * @param f The field to remove.
  */
 static void ReallyRemoveField(Field *f)
 {
+	CloseWindowById(WindowClass::FieldView, f->index);
 	for (TileIndex cur_tile : f->location) {
 		if (!IsTileType(cur_tile, TileType::Field)) continue;
 		MakeField(cur_tile, 0, IndustryID::Invalid());
@@ -223,6 +295,7 @@ static SpriteID GetFieldStageSprite(FieldStage stage)
 		SPR_FARMLAND_STATE_3, // Growing
 		SPR_FARMLAND_STATE_4, // Maturing
 		SPR_FARMLAND_STATE_5, // Ripe
+		SPR_FARMLAND_STATE_6, // Overripe
 		SPR_FARMLAND_STATE_7, // Withered
 	};
 	static_assert(std::size(stage_sprites) == to_underlying(FieldStage::End));
@@ -266,6 +339,13 @@ static void GetTileDesc_Field(TileIndex tile, TileDesc &td)
 	td.build_date = Field::GetByTile(tile)->build_date;
 }
 
+/** @copydoc ClickTileProc */
+static bool ClickTile_Field(TileIndex tile)
+{
+	ShowFieldWindow(GetFieldIndex(tile));
+	return true;
+}
+
 /** @copydoc ChangeTileOwnerProc */
 static void ChangeTileOwner_Field(TileIndex tile, Owner old_owner, Owner new_owner)
 {
@@ -301,6 +381,7 @@ extern const TileTypeProcs _tile_type_field_procs = {
 	.get_slope_pixel_z_proc = GetSlopePixelZ_Field,
 	.clear_tile_proc = ClearTile_Field,
 	.get_tile_desc_proc = GetTileDesc_Field,
+	.click_tile_proc = ClickTile_Field,
 	.tile_loop_proc = [](TileIndex) {},
 	.change_tile_owner_proc = ChangeTileOwner_Field,
 	.terraform_tile_proc = TerraformTile_Field,

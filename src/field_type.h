@@ -30,9 +30,33 @@ enum class FieldStage : uint8_t {
 	Sprouted, ///< First growth stage.
 	Growing, ///< Second growth stage.
 	Maturing, ///< Third growth stage.
-	Ripe, ///< Ready for harvest.
+	Ripe, ///< Ready for harvest, first month.
+	Overripe, ///< Ready for harvest, second and last month.
 	Withered, ///< Left ripe for too long; yields nothing.
 	End, ///< End marker.
 };
+
+/** Work that can be planned on a field. */
+enum class FieldTaskType : uint8_t {
+	Cultivate, ///< Fallow or withered ground becomes cultivated.
+	Sow, ///< Cultivated ground becomes sown.
+	Fertilise, ///< Bonus yield for cultivated or growing ground.
+	Spray, ///< Bonus yield for cultivated or growing ground.
+	Harvest, ///< Ripe crops become cargo; withered ones are cleared. Ground becomes fallow.
+	End, ///< End marker.
+};
+
+/** Ways to modify the task plan of a field. */
+enum class FieldTaskAction : uint8_t {
+	Insert, ///< Insert a task of type \a value before position \a pos.
+	Delete, ///< Delete the task at \a pos.
+	SetMonth, ///< Set the earliest start month of the task at \a pos to \a value (0 = any, 1..12).
+	SkipTo, ///< Make the task at \a pos the current task.
+	PerformNow, ///< Test helper: do the current task instantly on every eligible quarter.
+	End, ///< End marker.
+};
+
+static const uint FIELD_MAX_TASKS = 32; ///< Maximum length of a field's task plan.
+static const uint FIELD_QUARTER_YIELD = 3; ///< Cargo units one quarter yields at 100%.
 
 #endif /* FIELD_TYPE_H */

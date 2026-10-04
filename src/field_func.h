@@ -20,5 +20,6 @@ CommandCost ClearField(Field *f, TileIndex tile, DoCommandFlags flags);
 CommandCost RemoveFieldRoadStop(TileIndex tile, DoCommandFlags flags);
 
 Window *ShowBuildFarmToolbar();
+void ShowFieldWindow(FieldID field);
 
 #endif /* FIELD_FUNC_H */

@@ -56,6 +56,7 @@
 #include "vehicle_cmd.h"
 #include "vehicle_func.h"
 #include "field_func.h"
+#include "field_base.h"
 #include "roadveh.h"
 #include "viewport_func.h"
 #include "road_map.h"
@@ -592,6 +593,58 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 		}
 		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
 		IConsolePrint(CC_DEFAULT, "Vehicle {} built in depot {} and sent to work on field {}.", veh, depot, f->index);
+	}
+	return true;
+}
+
+/**
+ * Farm fork debug helper: set every quarter of a field to one stage, and point the plan at the matching task.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConFarmStage(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Set all quarters of a field to a stage (0 fallow .. 6 ripe .. 8 withered). Usage: 'farm_stage <field id> <stage>'.");
+		return true;
+	}
+	if (argv.size() != 3) return false;
+	auto id = ParseInteger(argv[1], 0);
+	auto stage = ParseInteger(argv[2], 0);
+	if (!id.has_value() || !stage.has_value() || *stage >= to_underlying(FieldStage::End)) return false;
+	Field *f = Field::GetIfValid(FieldID(*id));
+	if (f == nullptr) return false;
+	for (TileIndex tile : f->location) {
+		if (!IsTileType(tile, TileType::Field)) continue;
+		for (uint q = 0; q < 4; q++) SetFieldQuarterStage(tile, q, static_cast<FieldStage>(*stage));
+		MarkTileDirtyByTile(tile);
+	}
+	if (!IsValidCargoType(f->crop)) f->crop = GetDefaultFieldCrop();
+	FieldTaskType wanted = *stage >= to_underlying(FieldStage::Ripe) ? FieldTaskType::Harvest : (*stage == 0 ? FieldTaskType::Cultivate : FieldTaskType::Sow);
+	for (uint i = 0; i < f->tasks.size(); i++) {
+		if (f->tasks[i].type == wanted) {
+			f->cur_task = static_cast<uint8_t>(i);
+			f->cur_task_started = false;
+		}
+	}
+	return true;
+}
+
+/**
+ * Farm fork debug helper: override the cargo capacity of a vehicle, for measurements.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConFarmCap(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Override a road vehicle's capacity until reloaded. Usage: 'farm_cap <unit number> <capacity>'.");
+		return true;
+	}
+	if (argv.size() != 3) return false;
+	auto unit = ParseInteger(argv[1], 0);
+	auto cap = ParseInteger(argv[2], 0);
+	if (!unit.has_value() || !cap.has_value()) return false;
+	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (rv->IsFrontEngine() && rv->owner == _local_company && rv->unitnumber == *unit) rv->cargo_cap = static_cast<uint16_t>(*cap);
 	}
 	return true;
 }
@@ -3204,6 +3257,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("scrollto",                ConScrollToTile);
 	IConsole::CmdRegister("farm_field",              ConFarmField,        ConHookNoNetwork);
 	IConsole::CmdRegister("farm_list",               ConFarmList);
+	IConsole::CmdRegister("farm_stage",              ConFarmStage,        ConHookNoNetwork);
+	IConsole::CmdRegister("farm_cap",                ConFarmCap,          ConHookNoNetwork);
 	IConsole::CmdRegister("farm_demo",               ConFarmDemo,         ConHookNoNetwork);
 	IConsole::CmdRegister("farm_checker",            ConFarmChecker,      ConHookNoNetwork);
 	IConsole::CmdRegister("alias",                   ConAlias);

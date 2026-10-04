@@ -686,10 +686,9 @@ static int FindFieldSegment(const RoadVehicle *v, const Field &f, FieldTaskType 
 	bool harvest = type == FieldTaskType::Harvest;
 
 	std::vector<int> headlands{0, 1};
+	/* Nearest row first: the next row is then two inner headland quarters away. */
 	std::vector<int> rows;
 	for (int s = 2; s < count; s++) rows.push_back(s);
-	/* Others start with the row furthest from the corner, harvesting with the nearest. */
-	if (!harvest) std::reverse(rows.begin(), rows.end());
 
 	const std::vector<int> &first = harvest ? headlands : rows;
 	const std::vector<int> &second = harvest ? rows : headlands;

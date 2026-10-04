@@ -48,6 +48,8 @@
 #include "misc_cmd.h"
 #include "field_base.h"
 #include "field_cmd.h"
+#include "field_map.h"
+#include "viewport_func.h"
 #include "road_map.h"
 #include "tilearea_spiral.h"
 #include "town.h"
@@ -470,6 +472,33 @@ static bool ConFarmField(std::span<std::string_view> argv)
 		}
 	}
 	IConsolePrint(CC_ERROR, "No spot found.");
+	return true;
+}
+
+/**
+ * Farm fork debug helper: paint every quarter of a field with a different stage.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConFarmChecker(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Paint the quarters of a farm field with all stages in turn. Usage: 'farm_checker <field id>'.");
+		return true;
+	}
+	if (argv.size() != 2) return false;
+	auto id = ParseInteger(argv[1], 0);
+	if (!id.has_value()) return false;
+	Field *f = Field::GetIfValid(FieldID(*id));
+	if (f == nullptr) {
+		IConsolePrint(CC_ERROR, "No such field.");
+		return true;
+	}
+	uint i = 0;
+	for (TileIndex tile : f->location) {
+		if (!IsTileType(tile, TileType::Field)) continue;
+		for (uint q = 0; q < 4; q++) SetFieldQuarterStage(tile, q, static_cast<FieldStage>(i++ % to_underlying(FieldStage::End)));
+		MarkTileDirtyByTile(tile);
+	}
 	return true;
 }
 
@@ -3066,6 +3095,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("scrollto",                ConScrollToTile);
 	IConsole::CmdRegister("farm_field",              ConFarmField,        ConHookNoNetwork);
 	IConsole::CmdRegister("farm_list",               ConFarmList);
+	IConsole::CmdRegister("farm_checker",            ConFarmChecker,      ConHookNoNetwork);
 	IConsole::CmdRegister("alias",                   ConAlias);
 	IConsole::CmdRegister("load",                    ConLoad);
 	IConsole::CmdRegister("load_save",               ConLoad);

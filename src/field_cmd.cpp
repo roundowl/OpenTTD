@@ -281,25 +281,18 @@ CommandCost ClearField(Field *f, TileIndex tile, DoCommandFlags flags)
 }
 
 /**
- * Get the ground sprite for a field stage.
- * @param stage The stage.
- * @return Flat ground sprite; add #SlopeToSpriteOffset for slopes.
+ * Get the ground sprite of one quarter of a field tile.
+ * @param stage Growth stage of the quarter.
+ * @param tileh Slope of the tile; must not be steep.
+ * @param quarter Quarter index, 0..3, (y half << 1) | x half.
+ * @return The sprite; the four quarters of a tile are drawn at the same position.
  */
-static SpriteID GetFieldStageSprite(FieldStage stage)
+static SpriteID GetFieldQuarterSprite(FieldStage stage, Slope tileh, uint quarter)
 {
-	static const SpriteID stage_sprites[] = {
-		SPR_FARMLAND_HAYPACKS, // Fallow
-		SPR_FARMLAND_BARE, // Cultivated
-		SPR_FARMLAND_STATE_1, // Sown
-		SPR_FARMLAND_STATE_2, // Sprouted
-		SPR_FARMLAND_STATE_3, // Growing
-		SPR_FARMLAND_STATE_4, // Maturing
-		SPR_FARMLAND_STATE_5, // Ripe
-		SPR_FARMLAND_STATE_6, // Overripe
-		SPR_FARMLAND_STATE_7, // Withered
-	};
-	static_assert(std::size(stage_sprites) == to_underlying(FieldStage::End));
-	return stage_sprites[to_underlying(stage)];
+	static_assert(to_underlying(FieldStage::End) * FIELD_QUARTER_SLOPE_COUNT * 4 == FIELD_QUARTERS_SPRITE_COUNT);
+	uint slope = SlopeToSpriteOffset(tileh);
+	assert(slope < FIELD_QUARTER_SLOPE_COUNT);
+	return SPR_FIELD_QUARTERS_BASE + (to_underlying(stage) * FIELD_QUARTER_SLOPE_COUNT + slope) * 4 + quarter;
 }
 
 /** @copydoc DrawTileProc */
@@ -307,8 +300,9 @@ static void DrawTile_Field(TileInfo *ti)
 {
 	const Field *f = Field::GetByTile(ti->tile);
 
-	/* Placeholder: whole-tile farmland sprite of the first quarter until quarter sprites exist. */
-	DrawGroundSprite(GetFieldStageSprite(GetFieldQuarterStage(ti->tile, 0)) + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+	for (uint q = 0; q < 4; q++) {
+		DrawGroundSprite(GetFieldQuarterSprite(GetFieldQuarterStage(ti->tile, q), ti->tileh, q), PAL_NONE);
+	}
 
 	PaletteID pal = GetCompanyPalette(f->owner);
 	for (DiagDirection side = DiagDirection::Begin; side < DiagDirection::End; side++) {

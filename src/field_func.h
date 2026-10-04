@@ -43,6 +43,7 @@ std::pair<int, int> GetFieldSegmentEnd(const Field &f, int segment);
 int GetFieldSegmentCount(const Field &f);
 uint CountFieldSegmentEligibleQuarters(const Field &f, int segment, FieldTaskType type);
 FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f);
+bool IsFieldMachineIdle(const RoadVehicle *v);
 bool CanFieldMachineDo(const Vehicle *v, FieldTaskType type);
 
 CommandCost ClearField(Field *f, TileIndex tile, DoCommandFlags flags);

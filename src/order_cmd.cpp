@@ -1740,12 +1740,18 @@ void CheckOrders(const Vehicle *v)
 
 		/* Check the order list */
 		int n_st = 0;
+		bool works_fields = false;
 
 		for (const Order &order : v->Orders()) {
 			/* Dummy order? */
 			if (order.IsType(OT_DUMMY)) {
 				message = STR_NEWS_VEHICLE_HAS_VOID_ORDER;
 				break;
+			}
+			/* Farm fork: working a field is a stop of its own; even a single one is a complete schedule. */
+			if (order.IsType(OT_WORK_FIELD)) {
+				works_fields = true;
+				n_st++;
 			}
 			/* Does station have a load-bay for this vehicle? */
 			if (order.IsType(OT_GOTO_STATION)) {
@@ -1774,7 +1780,7 @@ void CheckOrders(const Vehicle *v)
 		}
 
 		/* Do we only have 1 station in our order list? */
-		if (n_st < 2 && message == INVALID_STRING_ID) message = STR_NEWS_VEHICLE_HAS_TOO_FEW_ORDERS;
+		if (n_st < 2 && !works_fields && message == INVALID_STRING_ID) message = STR_NEWS_VEHICLE_HAS_TOO_FEW_ORDERS;
 
 #ifdef WITH_ASSERT
 		if (v->orders != nullptr) v->orders->DebugCheckSanity();
@@ -2012,6 +2018,15 @@ bool UpdateOrderDest(Vehicle *v, const Order *order, int conditional_depth, bool
 
 		case OT_GOTO_DEPOT:
 			if (order->GetDepotOrderType().Test(OrderDepotTypeFlag::Service) && !v->NeedsServicing()) {
+				assert(!pbs_look_ahead);
+				UpdateVehicleTimetable(v, true);
+				v->IncrementRealOrderIndex();
+				break;
+			}
+			/* Farm fork: for farm machinery the depot is home while idle; skip it while a field has work. */
+			if (v->type == VehicleType::Road && IsFieldMachine(v) && !v->NeedsServicing() &&
+					std::ranges::any_of(v->Orders(), [](const Order &o) { return o.IsType(OT_WORK_FIELD); }) &&
+					!order->GetDepotActionType().Test(OrderDepotActionFlag::Halt) && !IsFieldMachineIdle(RoadVehicle::From(v))) {
 				assert(!pbs_look_ahead);
 				UpdateVehicleTimetable(v, true);
 				v->IncrementRealOrderIndex();

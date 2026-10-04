@@ -55,6 +55,7 @@
 #include "road_cmd.h"
 #include "vehicle_cmd.h"
 #include "vehicle_func.h"
+#include "depot_map.h"
 #include "field_func.h"
 #include "field_base.h"
 #include "roadveh.h"
@@ -591,6 +592,10 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 			unload.SetStopLocation(OrderStopLocation::FarEnd);
 			if (Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, unload).Failed()) IConsolePrint(CC_ERROR, "Unload order rejected.");
 		}
+		/* Back to the depot after each round, as players tend to do. */
+		Order to_depot;
+		to_depot.MakeGoToDepot(GetDepotIndex(depot), OrderDepotTypeFlag::PartOfOrders, {});
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, local_id == 89 ? 2 : 1, to_depot);
 		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
 		IConsolePrint(CC_DEFAULT, "Vehicle {} built in depot {} and sent to work on field {}.", veh, depot, f->index);
 	}

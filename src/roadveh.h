@@ -112,6 +112,8 @@ struct RoadVehFieldWork {
 	int8_t from_u = 1; ///< Cell the current route starts from, along the long side.
 	int8_t from_v = 1; ///< Cell the current route starts from, along the short side.
 	bool advance_order = false; ///< Whether to move to the next order on reaching the entry corner.
+	bool depot_wait = false; ///< Waiting in a depot because no field has work.
+	uint8_t dwell = 0; ///< NOSAVE: ticks left standing on a quarter just worked.
 	uint8_t bay_trackdir = 0; ///< Track direction the vehicle entered the bay with.
 	Direction bay_direction = Direction::N; ///< Direction of the vehicle when stopped in the bay.
 	int32_t bay_x = 0; ///< World X of the bay stop position.

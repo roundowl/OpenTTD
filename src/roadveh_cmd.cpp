@@ -1350,9 +1350,6 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 			return false;
 
 		case FieldRouteKind::Work: {
-			/* The quarter we are standing on is the last of the segment. */
-			if (!w.route.empty() && w.route.back().work && !RoadVehFieldWorkQuarter(v, f, w.route.back())) return true;
-
 			/* Segment done: take the next free one straight away, or head for the corner. */
 			w.advance_order = true;
 			auto [u, v_cell] = GetFieldSegmentEnd(*f, w.segment);
@@ -1406,6 +1403,9 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 	v->cur_speed = 0;
 	return false;
 }
+
+/** Ticks a machine stands on a quarter while working it. */
+static const uint8_t FIELD_WORK_DWELL_TICKS = 8;
 
 /** World movement per step for each #Direction. */
 static constexpr std::array<std::pair<int, int>, 8> _field_direction_delta = {{
@@ -1462,9 +1462,13 @@ static bool RoadVehFieldStep(RoadVehicle *v, Field *f)
 
 	const FieldWaypoint &target = w.route[w.step];
 	if (v->x_pos == target.x && v->y_pos == target.y) {
-		/* Arriving here means having left the quarter of the previous waypoint. */
-		if (w.kind == FieldRouteKind::Work && w.step > 0 && w.route[w.step - 1].work) {
-			if (!RoadVehFieldWorkQuarter(v, f, w.route[w.step - 1])) return true;
+		/* On the centre of a quarter to work: stop, work it, move on. */
+		if (w.kind == FieldRouteKind::Work && target.work) {
+			if (!RoadVehFieldWorkQuarter(v, f, target)) return true;
+			w.dwell = FIELD_WORK_DWELL_TICKS;
+			v->cur_speed = 0;
+			w.step++;
+			return false;
 		}
 		w.step++;
 		return true;
@@ -1519,6 +1523,13 @@ static bool RoadVehFieldController(RoadVehicle *v)
 	}
 
 	if (v->current_order.IsType(OT_LEAVESTATION)) v->current_order.Free();
+	if (w.dwell > 0) {
+		/* Standing on the quarter just worked. */
+		w.dwell--;
+		v->cur_speed = 0;
+		v->SetLastSpeed();
+		return true;
+	}
 	if (w.kind == FieldRouteKind::Servicing) {
 		/* Done loading or unloading: back to the corner to see what is next. */
 		RoadVehFieldSetRoute(v, FieldRouteKind::FromPark);
@@ -2014,6 +2025,12 @@ static bool RoadVehController(RoadVehicle *v)
 	if (v->IsInDepot()) {
 		/* Check if we should wait here for unbunching. */
 		if (v->IsWaitingForUnbunching()) return true;
+		/* Farm fork: idle farm machinery waits in the depot until one of its fields has work. */
+		if (IsFieldMachine(v)) {
+			/* Decide before leaving; while waiting, look again every 64 ticks. */
+			if (!v->field_work.depot_wait || (v->tick_counter & 0x3F) == 0) v->field_work.depot_wait = IsFieldMachineIdle(v);
+			if (v->field_work.depot_wait) return true;
+		}
 		if (RoadVehLeaveDepot(v, true)) return true;
 	}
 

@@ -874,6 +874,7 @@ public:
 		SaveLoad::Variable<VarFileType::I16>("field_work.segment", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.segment)),
 		SaveLoad::Variable<VarFileType::I8>("field_work.from_u", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.from_u)),
 		SaveLoad::Variable<VarFileType::I8>("field_work.from_v", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.from_v)),
+		SaveLoad::Variable<VarFileType::Bool>("field_work.depot_wait", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.depot_wait)),
 		SaveLoad::Variable<VarFileType::Bool>("field_work.advance_order", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.advance_order)),
 		SaveLoad::Variable<VarFileType::U8>("field_work.bay_trackdir", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.bay_trackdir)),
 		SaveLoad::Variable<VarFileType::U8>("field_work.bay_direction", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.bay_direction)),

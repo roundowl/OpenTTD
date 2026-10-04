@@ -730,6 +730,25 @@ FieldWorkAvailability CanStartFieldWork(const RoadVehicle *v, Field *f, FieldTas
 }
 
 /**
+ * Should a farm vehicle stay in the depot because none of its fields has work for it?
+ * @param v The vehicle, in a depot.
+ * @return True if it has field orders, no cargo to deliver, and nothing to do on any of its fields.
+ */
+bool IsFieldMachineIdle(const RoadVehicle *v)
+{
+	if (!IsFieldMachine(v) || v->cargo.StoredCount() > 0) return false;
+	bool has_field = false;
+	for (const Order &order : v->Orders()) {
+		if (!order.IsType(OT_WORK_FIELD)) continue;
+		Field *f = Field::GetByStation(order.GetDestination().ToStationID());
+		if (f == nullptr) continue;
+		has_field = true;
+		if (CanStartFieldWork(v, f, nullptr, nullptr) != FieldWorkAvailability::None) return false;
+	}
+	return has_field;
+}
+
+/**
  * Decide what a farm vehicle does at the entry corner of a field.
  * Does not change any vehicle state.
  * @param v The vehicle.

@@ -488,24 +488,14 @@ struct FieldPathBuilder {
 };
 
 /**
- * Number of work segments of a field: the two headland passes plus one per interior row pair.
- * Segment 0 is the outer headland, 1 the inner one (driven the other way round), 2 + k row pair k.
+ * Number of work segments of a field.
+ * Segment 0 is the entry strip: the tile column alongside the entry corner, along the long side,
+ * which also carries the lanes to every row. Segment 1 + j is row pair j, running along the short
+ * side right up to the far fence; row pair 0 starts straight off the corner tile.
  */
 static int GetFieldSegmentCount(const FieldFrame &fr)
 {
-	int rows = (fr.lu >= 6 && fr.lv >= 6) ? fr.lv / 2 - 2 : 0;
-	return 2 + rows;
-}
-
-/** Headland ring \a r (0 = outer, 1 = inner), running from next to the corner round to next to the corner. */
-static std::vector<FieldCell> GetFieldRing(const FieldFrame &fr, int r)
-{
-	std::vector<FieldCell> ring;
-	for (int u = 2; u <= fr.lu - 1 - r; u++) ring.push_back({u, r, true});
-	for (int v = r + 1; v <= fr.lv - 1 - r; v++) ring.push_back({fr.lu - 1 - r, v, true});
-	for (int u = fr.lu - 2 - r; u >= r; u--) ring.push_back({u, fr.lv - 1 - r, true});
-	for (int v = fr.lv - 2 - r; v >= 2; v--) ring.push_back({r, v, true});
-	return ring;
+	return 1 + fr.lv / 2;
 }
 
 /**
@@ -516,17 +506,17 @@ static std::vector<FieldCell> GetFieldRing(const FieldFrame &fr, int r)
  */
 static std::vector<FieldCell> GetFieldSegmentCells(const FieldFrame &fr, int segment)
 {
-	if (segment == 0) return GetFieldRing(fr, 0);
-	if (segment == 1) {
-		auto inner = GetFieldRing(fr, 1);
-		std::reverse(inner.begin(), inner.end());
-		return inner;
+	std::vector<FieldCell> cells;
+	if (segment == 0) {
+		/* Out on the inner lane, back on the outer one, ending next to the corner. */
+		for (int v = 2; v <= fr.lv - 1; v++) cells.push_back({1, v, true});
+		for (int v = fr.lv - 1; v >= 2; v--) cells.push_back({0, v, true});
+		return cells;
 	}
-	int k = segment - 2;
-	std::vector<FieldCell> row;
-	for (int u = 2; u <= fr.lu - 3; u++) row.push_back({u, 2 + 2 * k, true});
-	for (int u = fr.lu - 3; u >= 2; u--) row.push_back({u, 3 + 2 * k, true});
-	return row;
+	int j = segment - 1;
+	for (int u = 2; u <= fr.lu - 1; u++) cells.push_back({u, 2 * j, true});
+	for (int u = fr.lu - 1; u >= 2; u--) cells.push_back({u, 2 * j + 1, true});
+	return cells;
 }
 
 /** Cells of a work route: from the vehicle's start cell to the segment, then the segment. */
@@ -671,8 +661,8 @@ static bool IsFieldSegmentReserved(const Field &f, int segment, const RoadVehicl
 
 /**
  * Find a segment a vehicle can work on.
- * Harvesting does the headlands first, everything else the rows first; a segment of the
- * second phase is only handed out once no segment of the first has work left or is being worked.
+ * The entry strip and the row pair beside the corner come first; the other rows are only handed
+ * out once the strip has no work left and nobody is working it.
  * @param v The vehicle.
  * @param f The field.
  * @param type The task.
@@ -683,34 +673,26 @@ static int FindFieldSegment(const RoadVehicle *v, const Field &f, FieldTaskType 
 {
 	FieldFrame fr(f);
 	int count = GetFieldSegmentCount(fr);
-	bool harvest = type == FieldTaskType::Harvest;
 
-	std::vector<int> headlands{0, 1};
-	/* Nearest row first: the next row is then two inner headland quarters away. */
-	std::vector<int> rows;
-	for (int s = 2; s < count; s++) rows.push_back(s);
-
-	const std::vector<int> &first = harvest ? headlands : rows;
-	const std::vector<int> &second = harvest ? rows : headlands;
+	/* The row pair next to the corner needs no strip lanes and the strip needs none either: both
+	 * are open at once. The other rows are reached over the strip, so they wait until it is done.
+	 * Nearest first. */
+	bool strip_open = IsFieldSegmentReserved(f, 0, v) || CountSegmentEligibleQuarters(f, fr, 0, type) > 0;
+	std::vector<int> order{1, 0};
+	for (int s = 2; s < count; s++) order.push_back(s);
 
 	busy = false;
-	bool first_open = false;
-	for (int s : first) {
-		bool reserved = IsFieldSegmentReserved(f, s, v);
-		bool has_work = CountSegmentEligibleQuarters(f, fr, s, type) > 0;
-		if (reserved || has_work) first_open = true;
-		if (has_work && !reserved) return s;
-		if (has_work) busy = true;
-	}
-	if (first_open) {
-		busy = true;
-		return -1;
-	}
-	for (int s : second) {
-		bool reserved = IsFieldSegmentReserved(f, s, v);
-		bool has_work = CountSegmentEligibleQuarters(f, fr, s, type) > 0;
-		if (has_work && !reserved) return s;
-		if (has_work) busy = true;
+	for (int s : order) {
+		if (CountSegmentEligibleQuarters(f, fr, s, type) == 0) continue;
+		if (s >= 2 && strip_open) {
+			busy = true; // Waiting for the strip.
+			continue;
+		}
+		if (IsFieldSegmentReserved(f, s, v)) {
+			busy = true;
+			continue;
+		}
+		return s;
 	}
 	return -1;
 }

@@ -531,13 +531,13 @@ static bool ConFarmChecker(std::span<std::string_view> argv)
 static bool ConFarmDemo(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build a farm field with machinery working on it. Usage: 'farm_demo [<tractors> <harvesters> [<length> <width>]]'. Default: 1 1 4 3.");
+		IConsolePrint(CC_HELP, "Build a farm field with machinery working on it. Usage: 'farm_demo [<tractors> <harvesters> [<length> <width> [<lorries>]]]'. Default: 1 1 4 3 0.");
 		return true;
 	}
 	if (!Company::IsValidID(_local_company)) return true;
 
 	auto arg = [&](size_t i, uint def) { return i < argv.size() ? ParseInteger(argv[i], 0).value_or(def) : def; };
-	uint tractors = arg(1, 1), harvesters = arg(2, 1);
+	uint tractors = arg(1, 1), harvesters = arg(2, 1), lorries = arg(5, 0);
 	Field *f = AutoBuildField(arg(3, 4), arg(4, 3));
 	if (f == nullptr) return true;
 
@@ -566,6 +566,7 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 
 	std::vector<uint> machines(tractors, 88u);
 	machines.insert(machines.end(), harvesters, 89u);
+	machines.insert(machines.end(), lorries, 25u); // Hereford Grain Truck
 	for (uint local_id : machines) {
 		EngineID engine = EngineID::Invalid();
 		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
@@ -578,6 +579,18 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 		auto [ret, veh, refit_capacity, refit_mail, capacities] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, engine, false, INVALID_CARGO, ClientID::Invalid);
 		if (ret.Failed()) {
 			IConsolePrint(CC_ERROR, "Building farm engine {} failed.", local_id);
+			continue;
+		}
+		if (local_id == 25) {
+			/* Lorry: collect at the field, take it back to the depot area; tests turning in the dead-end stop. */
+			Order load;
+			load.MakeGoToStation(f->station);
+			load.SetStopLocation(OrderStopLocation::FarEnd);
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, load);
+			Order home;
+			home.MakeGoToDepot(GetDepotIndex(depot), OrderDepotTypeFlag::PartOfOrders, {});
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, home);
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
 			continue;
 		}
 		Order order;
@@ -678,7 +691,11 @@ static bool ConFarmList(std::span<std::string_view> argv)
 		if (tasks != 0) IConsolePrint(CC_DEFAULT, "  engine {} ({}): field tasks {:#x}", e->index, GetString(e->info.string_id), tasks);
 	}
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
-		if (!rv->IsFrontEngine() || !IsFieldMachine(rv)) continue;
+		if (!rv->IsFrontEngine()) continue;
+		if (!IsFieldMachine(rv)) {
+			IConsolePrint(CC_DEFAULT, "  lorry {}: state {:#x}, frame {}, tile {}, order type {}, cargo {}/{}", rv->unitnumber, rv->state, rv->frame, rv->tile, to_underlying(rv->current_order.GetType()), rv->cargo.StoredCount(), rv->cargo_cap);
+			continue;
+		}
 		IConsolePrint(CC_DEFAULT, "  vehicle {}: {} orders, cur {}, state {:#x}, order type {}, field {}, seg {}, from ({},{}), kind {}, task {}, step {}/{}, cargo {}/{}", rv->unitnumber, rv->GetNumOrders(), rv->cur_real_order_index, rv->state, to_underlying(rv->current_order.GetType()),
 				rv->state == RVSB_IN_FIELD ? static_cast<int>(rv->field_work.field.base()) : -1, rv->field_work.segment, rv->field_work.from_u, rv->field_work.from_v, to_underlying(rv->field_work.kind), to_underlying(rv->field_work.task),
 				rv->field_work.step, rv->field_work.route.size(), rv->cargo.StoredCount(), rv->cargo_cap);

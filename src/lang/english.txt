@@ -3050,7 +3050,7 @@ STR_TOOLBAR_AIRCRAFT_BUILD_AIRPORT_TOOLTIP                      :{BLACK}Build ai
 
 # Farm toolbar
 STR_TOOLBAR_FARM_CAPTION                                        :{WHITE}Farming
-STR_TOOLBAR_FARM_BUILD_FIELD_TOOLTIP                            :{BLACK}Build a field. Start dragging on the corner that becomes the field entrance: a lorry bay that faces the adjacent road. Fields are 2x2 to 16x16 tiles. Also press Shift to show cost estimate only
+STR_TOOLBAR_FARM_BUILD_FIELD_TOOLTIP                            :{BLACK}Build a field. Start dragging on the corner that becomes the field entrance: a drive-through lorry stop from the adjacent road into the field. Fields are 2x2 to 16x16 tiles. Also press Shift to show cost estimate only
 
 # Field view
 STR_FIELD_VIEW_CAPTION                                          :{WHITE}{STATION} field

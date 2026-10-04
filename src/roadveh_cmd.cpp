@@ -1222,19 +1222,26 @@ static bool RoadVehTryEnterField(RoadVehicle *v, RoadStop *rs, const Station *st
 
 	FieldCornerAction action = EvaluateFieldCorner(v, f);
 	if (action == FieldCornerAction::MoveOn) {
+		/* On to the next order. If that is this station, the stop that follows in this tick serves it. */
 		RoadVehFieldAdvanceOrder(v);
-		/* A next order for this same station forgets the visit; we are still here though. */
-		v->last_station_visited = st->index;
+		v->last_station_visited = StationID::Invalid();
 		return false;
 	}
 	if (action == FieldCornerAction::Leave) return false;
 
 	RoadVehFieldWork &w = v->field_work;
 	w.field = f->index;
-	w.bay_trackdir = v->state & RVSB_ROAD_STOP_TRACKDIR_MASK;
-	w.bay_direction = v->direction;
-	w.bay_x = v->x_pos;
-	w.bay_y = v->y_pos;
+	{
+		/* Come back out on the other lane, starting at the field side of the stop. */
+		DiagDirection out = ReverseDiagDir(DirToDiagDir(v->direction));
+		Trackdir td = DiagDirToDiagTrackdir(out);
+		uint side = to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE;
+		const RoadDriveEntry &rd = _road_drive_data[GetRoadTramType(v->roadtype)][to_underlying(td) + side][0];
+		w.bay_trackdir = to_underlying(td);
+		w.bay_direction = DiagDirToDir(out);
+		w.bay_x = TileX(v->tile) * TILE_SIZE + (rd.x & 15);
+		w.bay_y = TileY(v->tile) * TILE_SIZE + (rd.y & 15);
+	}
 	w.advance_order = false;
 	w.segment = -1;
 	w.from_u = 1;
@@ -1258,30 +1265,25 @@ static bool RoadVehTryEnterField(RoadVehicle *v, RoadStop *rs, const Station *st
 }
 
 /**
- * Put a field vehicle back into the bay of the entry corner, as if it had just arrived there.
+ * Put a field vehicle back into the drive-through stop of the entry corner, on the lane out, as if it had just arrived.
  * The normal road stop logic then loads, starts the next field order or drives off.
  * @param v The vehicle, at the bay position.
  * @param f The field.
- * @return False if no bay is free right now.
+ * @return Always true; a drive-through stop always takes the vehicle.
  */
 static bool RoadVehFieldExitToBay(RoadVehicle *v, const Field *f)
 {
 	RoadStop *rs = RoadStop::GetByTile(f->corner, RoadStopType::Truck);
 	RoadVehFieldWork &w = v->field_work;
 
+	/* Rejoin the outbound lane at the field side; the stop then works as for any arrival. */
 	v->state = w.bay_trackdir;
-	if (rs->IsEntranceBusy() || !rs->Enter(v)) {
-		v->state = RVSB_IN_FIELD;
-		return false;
-	}
-
-	uint side = to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE;
-	v->frame = _road_stop_stop_frame[v->state - RVSB_IN_ROAD_STOP + side];
-	const RoadDriveEntry &rd = _road_drive_data[GetRoadTramType(v->roadtype)][v->state + side][v->frame];
-	v->x_pos = TileX(f->corner) * TILE_SIZE + (rd.x & 15);
-	v->y_pos = TileY(f->corner) * TILE_SIZE + (rd.y & 15);
-	v->tile = f->corner;
 	v->direction = w.bay_direction;
+	rs->Enter(v);
+	v->frame = 0;
+	v->x_pos = w.bay_x;
+	v->y_pos = w.bay_y;
+	v->tile = f->corner;
 	v->cur_speed = 0;
 
 	w.field = FieldID::Invalid();
@@ -1910,6 +1912,16 @@ again:
 		return true;
 	}
 
+	/* Farm fork: a field machine heading into the field through a drive-through entry corner turns into it here. */
+	if (v->IsFrontEngine() && IsInsideMM(v->state, RVSB_IN_DT_ROAD_STOP, RVSB_IN_DT_ROAD_STOP_END) &&
+			v->frame == RVC_DRIVE_THROUGH_STOP_FRAME && v->current_order.IsType(OT_WORK_FIELD)) {
+		const Field *f = Field::GetByCornerTile(v->tile);
+		if (f != nullptr && f->location.Contains(TileAddByDiagDir(v->tile, DirToDiagDir(v->direction)))) {
+			RoadStop *rs = RoadStop::GetByTile(v->tile, GetRoadStopType(v->tile));
+			if (RoadVehTryEnterField(v, rs, Station::GetByTile(v->tile))) return false;
+		}
+	}
+
 	/* If the vehicle is in a normal road stop and the frame equals the stop frame OR
 	 * if the vehicle is in a drive-through road stop and this is the destination station
 	 * and it's the correct type of stop (bus or truck) and the frame equals the stop frame...
@@ -1950,9 +1962,6 @@ again:
 			SetBit(v->state, RVS_ENTERED_STOP);
 
 			v->last_station_visited = st->index;
-
-			/* Farm fork: a field order makes the vehicle drive into the field from here. */
-			if (IsBayRoadStopTile(v->tile) && RoadVehTryEnterField(v, rs, st)) return false;
 
 			if (IsDriveThroughStopTile(v->tile) || (v->current_order.IsType(OT_GOTO_STATION) && v->current_order.GetDestination() == st->index)) {
 				RoadVehArrivesAt(v, st);

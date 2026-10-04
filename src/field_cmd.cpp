@@ -156,7 +156,8 @@ CommandCost CmdBuildField(DoCommandFlags flags, TileIndex tile, TileIndex start_
 	}
 
 	DiagDirection entrance = ChooseFieldEntrance(area, start_tile);
-	CommandCost ret = Command<Commands::BuildRoadStop>::Do(flags, start_tile, 1, 1, RoadStopType::Truck, false, entrance, rt, ROADSTOP_CLASS_DFLT, 0, NEW_STATION, true);
+	/* A drive-through stop from the road into the field: machines drive on through it, lorries turn at its dead end. */
+	CommandCost ret = Command<Commands::BuildRoadStop>::Do(flags, start_tile, 1, 1, RoadStopType::Truck, true, entrance, rt, ROADSTOP_CLASS_DFLT, 0, NEW_STATION, true);
 	if (ret.Failed()) return ret;
 	cost.AddCost(ret.GetCost());
 

@@ -1404,9 +1404,6 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 	return false;
 }
 
-/** Ticks a machine stands on a quarter while working it. */
-static const uint8_t FIELD_WORK_DWELL_TICKS = 8;
-
 /** World movement per step for each #Direction. */
 static constexpr std::array<std::pair<int, int>, 8> _field_direction_delta = {{
 	{-1, -1}, // N
@@ -1462,14 +1459,8 @@ static bool RoadVehFieldStep(RoadVehicle *v, Field *f)
 
 	const FieldWaypoint &target = w.route[w.step];
 	if (v->x_pos == target.x && v->y_pos == target.y) {
-		/* On the centre of a quarter to work: stop, work it, move on. */
-		if (w.kind == FieldRouteKind::Work && target.work) {
-			if (!RoadVehFieldWorkQuarter(v, f, target)) return true;
-			w.dwell = FIELD_WORK_DWELL_TICKS;
-			v->cur_speed = 0;
-			w.step++;
-			return false;
-		}
+		/* On the centre of a quarter to work: work it while driving on. */
+		if (w.kind == FieldRouteKind::Work && target.work && !RoadVehFieldWorkQuarter(v, f, target)) return true;
 		w.step++;
 		return true;
 	}
@@ -1523,13 +1514,6 @@ static bool RoadVehFieldController(RoadVehicle *v)
 	}
 
 	if (v->current_order.IsType(OT_LEAVESTATION)) v->current_order.Free();
-	if (w.dwell > 0) {
-		/* Standing on the quarter just worked. */
-		w.dwell--;
-		v->cur_speed = 0;
-		v->SetLastSpeed();
-		return true;
-	}
 	if (w.kind == FieldRouteKind::Servicing) {
 		/* Done loading or unloading: back to the corner to see what is next. */
 		RoadVehFieldSetRoute(v, FieldRouteKind::FromPark);

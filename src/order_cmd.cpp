@@ -2255,6 +2255,10 @@ bool Order::ShouldStopAtStation(const Vehicle *v, StationID station) const
 {
 	bool is_dest_station = this->IsType(OT_GOTO_STATION) && this->dest == station;
 
+	/* Farm fork: farm machinery only stops where its orders say; unscheduled stops at a field's
+	 * drive-through entry would add implicit orders and send it round in circles. */
+	if (!is_dest_station && IsFieldMachine(v)) return false;
+
 	return (!this->IsType(OT_GOTO_DEPOT) || this->GetDepotOrderType().Test(OrderDepotTypeFlag::PartOfOrders)) &&
 			v->last_station_visited != station && // Do stop only when we've not just been there
 			/* Finally do stop when there is no non-stop flag set for this type of station. */

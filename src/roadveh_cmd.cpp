@@ -1392,7 +1392,8 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 		if (v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station) RoadVehFieldAdvanceOrder(v);
 	}
 
-	switch (EvaluateFieldCorner(v, f)) {
+	FieldCornerAction corner_action = EvaluateFieldCorner(v, f);
+	switch (corner_action) {
 		case FieldCornerAction::StartWork:
 			RoadVehFieldStartWork(v, f);
 			return true;
@@ -1408,6 +1409,15 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 
 		case FieldCornerAction::MoveOn:
 			RoadVehFieldAdvanceOrder(v);
+			if (v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station) {
+				/* The orders lead straight back here (a depot visit was skipped): no point driving round. */
+				if (EvaluateFieldCorner(v, f) == FieldCornerAction::StartWork) {
+					RoadVehFieldStartWork(v, f);
+				} else {
+					RoadVehFieldSetRoute(v, FieldRouteKind::ToPark);
+				}
+				return true;
+			}
 			[[fallthrough]];
 
 		case FieldCornerAction::Leave:

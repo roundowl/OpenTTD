@@ -108,6 +108,9 @@ struct RoadVehFieldWork {
 	FieldTaskType task = FieldTaskType::Cultivate; ///< Task of the work route.
 	uint16_t step = 0; ///< Index into #route of the waypoint being driven to.
 	uint16_t backtrack_from = 0; ///< Work route step at which a backtrack started.
+	int16_t segment = -1; ///< Work segment held: 0 outer headland, 1 inner headland, 2 + k row pair k.
+	int8_t from_u = 1; ///< Cell the current route starts from, along the long side.
+	int8_t from_v = 1; ///< Cell the current route starts from, along the short side.
 	bool advance_order = false; ///< Whether to move to the next order on reaching the entry corner.
 	uint8_t bay_trackdir = 0; ///< Track direction the vehicle entered the bay with.
 	Direction bay_direction = Direction::N; ///< Direction of the vehicle when stopped in the bay.

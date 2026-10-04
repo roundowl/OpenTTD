@@ -1165,19 +1165,21 @@ static void RoadVehFieldSetRoute(RoadVehicle *v, FieldRouteKind kind)
 }
 
 /**
- * Start a work run; pays for fertiliser and spray up front.
- * @param v The vehicle, at the entry corner.
+ * Start working a segment; pays for fertiliser and spray of that segment up front.
+ * @param v The vehicle, at the cell given by from_u/from_v of its field state.
  * @param f The field.
  */
 static void RoadVehFieldStartWork(RoadVehicle *v, Field *f)
 {
 	FieldTaskType task;
-	[[maybe_unused]] bool ok = CanStartFieldWork(v, f, &task);
-	assert(ok);
+	int segment;
+	[[maybe_unused]] FieldWorkAvailability ok = CanStartFieldWork(v, f, &task, &segment);
+	assert(ok == FieldWorkAvailability::Start);
 	v->field_work.task = task;
+	v->field_work.segment = segment;
 
 	if (task == FieldTaskType::Fertilise || task == FieldTaskType::Spray) {
-		CommandCost cost(ExpensesType::RoadVehRun, GetFieldTreatmentCost(task) * f->CountEligibleQuarters(task));
+		CommandCost cost(ExpensesType::RoadVehRun, GetFieldTreatmentCost(task) * CountFieldSegmentEligibleQuarters(*f, segment, task));
 		v->profit_this_year -= cost.GetCost() << 8;
 		SubtractMoneyFromCompany(v->owner, cost);
 		SetWindowDirty(WindowClass::VehicleDetails, v->index);
@@ -1223,6 +1225,9 @@ static bool RoadVehTryEnterField(RoadVehicle *v, RoadStop *rs, const Station *st
 	w.bay_x = v->x_pos;
 	w.bay_y = v->y_pos;
 	w.advance_order = false;
+	w.segment = -1;
+	w.from_u = 1;
+	w.from_v = 1;
 
 	rs->Leave(v);
 	v->state = RVSB_IN_FIELD;
@@ -1322,15 +1327,33 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 			v->cur_speed = 0;
 			return false;
 
-		case FieldRouteKind::Work:
+		case FieldRouteKind::Work: {
+			/* The quarter we are standing on is the last of the segment. */
+			if (!w.route.empty() && w.route.back().work && !RoadVehFieldWorkQuarter(v, f, w.route.back())) return true;
+
+			/* Segment done: take the next free one straight away, or head for the corner. */
 			w.advance_order = true;
-			break;
+			auto [u, v_cell] = GetFieldSegmentEnd(*f, w.segment);
+			w.from_u = static_cast<int8_t>(u);
+			w.from_v = static_cast<int8_t>(v_cell);
+			bool ordered_here = v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station;
+			if (ordered_here && CanStartFieldWork(v, f, nullptr, nullptr) == FieldWorkAvailability::Start) {
+				RoadVehFieldStartWork(v, f);
+			} else {
+				w.segment = -1;
+				RoadVehFieldSetRoute(v, FieldRouteKind::ToCorner);
+			}
+			return true;
+		}
 
 		default:
 			break;
 	}
 
 	/* At the entry corner. */
+	w.segment = -1;
+	w.from_u = 1;
+	w.from_v = 1;
 	if (w.advance_order) {
 		w.advance_order = false;
 		if (v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station) RoadVehFieldAdvanceOrder(v);
@@ -1358,6 +1381,48 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 	return false;
 }
 
+/** World movement per step for each #Direction. */
+static constexpr std::array<std::pair<int, int>, 8> _field_direction_delta = {{
+	{-1, -1}, // N
+	{-1, 0}, // NE
+	{-1, 1}, // E
+	{0, 1}, // SE
+	{1, 1}, // S
+	{1, 0}, // SW
+	{1, -1}, // W
+	{0, -1}, // NW
+}};
+
+/**
+ * Is another machine working the same field right in front of a field vehicle?
+ * Machines on the same lane keep their distance. Oncoming machines, parked ones and
+ * anything on the entry corner tile are ignored, so the corner cannot deadlock.
+ * @param v The vehicle about to move.
+ * @param f The field.
+ * @param dx Movement along world X, -1..1.
+ * @param dy Movement along world Y, -1..1.
+ * @return True if the vehicle has to wait.
+ */
+static bool IsFieldPathBlocked(const RoadVehicle *v, const Field *f, int dx, int dy)
+{
+	if (v->tile == f->corner) return false;
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (rv == v || rv->state != RVSB_IN_FIELD || rv->field_work.field != f->index) continue;
+		if (rv->field_work.kind == FieldRouteKind::Parked || rv->tile == f->corner) continue;
+
+		int ox = rv->x_pos - v->x_pos;
+		int oy = rv->y_pos - v->y_pos;
+		int along = ox * dx + oy * dy;
+		int lateral = std::abs(ox * dy - oy * dx);
+		if (along <= 0 || along > 8 || lateral >= 4) continue;
+
+		auto [odx, ody] = _field_direction_delta[to_underlying(rv->direction)];
+		if (odx * dx + ody * dy < 0) continue; // Coming towards us.
+		return true;
+	}
+	return false;
+}
+
 /**
  * Move a field vehicle by one unit along its route.
  * @param v The vehicle.
@@ -1381,6 +1446,10 @@ static bool RoadVehFieldStep(RoadVehicle *v, Field *f)
 
 	int dx = Clamp(target.x - v->x_pos, -1, 1);
 	int dy = Clamp(target.y - v->y_pos, -1, 1);
+	if (IsFieldPathBlocked(v, f, dx, dy)) {
+		v->cur_speed = 0;
+		return false;
+	}
 	static const Direction dirs[3][3] = {
 		/* dy = -1        dy = 0         dy = +1 */
 		{Direction::N, Direction::NE, Direction::E}, // dx = -1

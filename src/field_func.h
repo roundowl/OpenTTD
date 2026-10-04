@@ -31,7 +31,17 @@ struct RoadVehicle;
 struct RoadVehFieldWork;
 struct FieldWaypoint;
 std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWork &work);
-bool CanStartFieldWork(const RoadVehicle *v, Field *f, FieldTaskType *task);
+/** Whether a farm vehicle can start working on a field. */
+enum class FieldWorkAvailability : uint8_t {
+	Start, ///< There is a free segment for it.
+	Busy, ///< There is work, but other machines hold all of it.
+	None, ///< Nothing it can do here.
+};
+
+FieldWorkAvailability CanStartFieldWork(const RoadVehicle *v, Field *f, FieldTaskType *task, int *segment);
+std::pair<int, int> GetFieldSegmentEnd(const Field &f, int segment);
+int GetFieldSegmentCount(const Field &f);
+uint CountFieldSegmentEligibleQuarters(const Field &f, int segment, FieldTaskType type);
 FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f);
 bool CanFieldMachineDo(const Vehicle *v, FieldTaskType type);
 

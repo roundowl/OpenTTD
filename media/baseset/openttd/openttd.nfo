@@ -102,3 +102,4 @@
 #include "overlay_rocks.nfo"
 #include "bridge_decks.nfo"
 #include "field_quarters.nfo"
+#include "field_machinery.nfo"

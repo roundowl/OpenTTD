@@ -14,6 +14,7 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/canals.nfo
                          ${CMAKE_CURRENT_SOURCE_DIR}/chars.nfo
                          ${CMAKE_CURRENT_SOURCE_DIR}/elrails.nfo
+                         ${CMAKE_CURRENT_SOURCE_DIR}/field_machinery.nfo
                          ${CMAKE_CURRENT_SOURCE_DIR}/field_quarters.nfo
                          ${CMAKE_CURRENT_SOURCE_DIR}/foundations.nfo
                          ${CMAKE_CURRENT_SOURCE_DIR}/mono.nfo
@@ -39,6 +40,7 @@ if(GRFCODEC_FOUND)
                          ${CMAKE_CURRENT_SOURCE_DIR}/canal_locks.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/chars.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/elrails.png
+                         ${CMAKE_CURRENT_SOURCE_DIR}/field_machinery.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/field_quarters.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/foundations.png
                          ${CMAKE_CURRENT_SOURCE_DIR}/mono.png

@@ -117,6 +117,7 @@ static constexpr auto _action5_types = std::to_array<Action5Type>({
 	/* 0x3E */ { Action5BlockType::Invalid,     0,                            0, 0,                                           "Type 0x3E"                },
 	/* 0x3F */ { Action5BlockType::Invalid,     0,                            0, 0,                                           "Type 0x3F"                },
 	/* 0x40 */ { Action5BlockType::AllowOffset, SPR_FIELD_QUARTERS_BASE,      1, FIELD_QUARTERS_SPRITE_COUNT,                 "Farm field quarters"      },
+	/* 0x41 */ { Action5BlockType::AllowOffset, SPR_FIELD_MACHINERY_BASE,     1, FIELD_MACHINERY_SPRITE_COUNT,                "Farm machinery"           },
 });
 
 /**

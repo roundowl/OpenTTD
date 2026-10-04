@@ -304,6 +304,8 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	MR(  5479,  20,  15,  55, CT_BUBBLES     , LandscapeTypes({      Y})), // 201 MightyMover Bubble Truck
 	MR( 20970,  20,  15,  55, CT_BUBBLES     , LandscapeTypes({      Y})), // 202 Powernaught Bubble Truck
 	MR( 33023,  20,  15,  85, CT_BUBBLES     , LandscapeTypes({      Y})), // 203 Wizzowow Bubble Truck
+	MR(  5479,  20,  15,  55, MCT_GRAIN_WHEAT_MAIZE, LandscapeTypes({T,A,S  })), // farm fork: Farmhand Tractor
+	MR(  5479,  20,  15,  55, MCT_GRAIN_WHEAT_MAIZE, LandscapeTypes({T,A,S  })), // farm fork: Reaper Combine Harvester
 	MS(  2922,   5,  30,  50, CT_OIL         , LandscapeTypes({T,A,S  })), // 204 MPS Oil Tanker
 	MS( 17167,   5,  30,  90, CT_OIL         , LandscapeTypes({T,A,S  })), // 205 CS-Inc. Oil Tanker
 	MS(  2192,   5,  30,  55, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 206 MPS Passenger Ferry
@@ -667,6 +669,8 @@ static constexpr AircraftVehicleInfo _orig_aircraft_vehicle_info[] = {
  * Air drag value depends on the top speed of the vehicle.
  */
 #define ROV(a, b, c, d, e, f, g, h) { a, b, c, Price::RunningRoadveh, d, e, f, g, h, 76, 0, VE_DEFAULT, 0, ROADTYPE_ROAD }
+/** Like #ROV, with a bitmask of field tasks as last parameter (farm fork). */
+#define ROVF(a, b, c, d, e, f, g, h, i) { a, b, c, Price::RunningRoadveh, d, e, f, g, h, 76, 0, VE_DEFAULT, 0, ROADTYPE_ROAD, i }
 static constexpr RoadVehicleInfo _orig_road_vehicle_info[] = {
 	/*    image_index       sfx                            max_speed    power
 	 *    |    cost_factor  |                              |   capacity |
@@ -760,6 +764,9 @@ static constexpr RoadVehicleInfo _orig_road_vehicle_info[] = {
 	ROV( 62, 117,  90, SND_40_DEPARTURE_TRUCK_TOYLAND_2,  96, 17,  38, 12), // 85 MightyMover Bubble Truck
 	ROV( 62, 147, 168, SND_3F_DEPARTURE_TRUCK_TOYLAND_1, 176, 19,  48, 22), // 86 Powernaught Bubble Truck
 	ROV( 62, 157, 240, SND_40_DEPARTURE_TRUCK_TOYLAND_2, 224, 22,  69, 45), // 87 Wizzowow Bubble Truck
+	/* Farm fork machinery; last field: bitmask of FieldTaskType (Cultivate 1, Sow 2, Fertilise 4, Spray 8, Harvest 16). */
+	ROVF(63, 100,  90, SND_19_DEPARTURE_OLD_RV_1,         64,  0,  20, 10, 0x0F), // 88 Farmhand Tractor
+	ROVF(64, 140, 120, SND_19_DEPARTURE_OLD_RV_1,         56, 25,  40, 20, 0x10), // 89 Reaper Combine Harvester
 };
 #undef ROV
 

@@ -53,7 +53,8 @@ static const uint16_t _roadveh_images[] = {
 	0xCB4, 0xCBC, 0xD94, 0xD9C, 0xDA4, 0xDAC, 0xDB4, 0xDBC,
 	0xDCC, 0xDD4, 0xDE4, 0xDDC, 0xDEC, 0xDC4, 0xDDC, 0xDE4,
 	0xE2C, 0xE34, 0xE3C, 0xC14, 0xC1C, 0xC2C, 0xC3C, 0xC4C,
-	0xC5C, 0xC64, 0xC6C, 0xC74, 0xC84, 0xC94, 0xCA4
+	0xC5C, 0xC64, 0xC6C, 0xC74, 0xC84, 0xC94, 0xCA4,
+	SPR_FIELD_MACHINERY_BASE, SPR_FIELD_MACHINERY_BASE + 8, // farm fork: tractor, combine harvester
 };
 
 static const uint16_t _roadveh_full_adder[] = {
@@ -64,7 +65,8 @@ static const uint16_t _roadveh_full_adder[] = {
 	16,  16,   0,  88,   0,   0,   0,   0,
 	48,  48,  48,  48,   0,   0,  64,  64,
 	 0,  16,  16,   0,   8,   8,   8,   8,
-	 0,   0,   0,   8,   8,   8,   8
+	 0,   0,   0,   8,   8,   8,   8,
+	 0,   0,
 };
 static_assert(lengthof(_roadveh_images) == lengthof(_roadveh_full_adder));
 

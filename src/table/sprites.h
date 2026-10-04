@@ -383,7 +383,11 @@ static const SpriteID SPR_FIELD_QUARTERS_BASE = SPR_BRIDGE_DECKS_BASE + BRIDGE_D
 static const uint16_t FIELD_QUARTER_SLOPE_COUNT = 15; ///< Flat plus the 14 non-steep slopes, indexed by #SlopeToSpriteOffset.
 static const uint16_t FIELD_QUARTERS_SPRITE_COUNT = 9 * FIELD_QUARTER_SLOPE_COUNT * 4;
 
-static const SpriteID SPR_NEWGRFS_BASE = SPR_FIELD_QUARTERS_BASE + FIELD_QUARTERS_SPRITE_COUNT;
+/* Farm fork: farm machinery, two vehicles with 8 directions each. */
+static const SpriteID SPR_FIELD_MACHINERY_BASE = SPR_FIELD_QUARTERS_BASE + FIELD_QUARTERS_SPRITE_COUNT;
+static const uint16_t FIELD_MACHINERY_SPRITE_COUNT = 16;
+
+static const SpriteID SPR_NEWGRFS_BASE = SPR_FIELD_MACHINERY_BASE + FIELD_MACHINERY_SPRITE_COUNT;
 
 /** Manager face sprites.
  * @{ */

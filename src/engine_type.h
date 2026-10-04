@@ -162,6 +162,7 @@ struct RoadVehicleInfo {
 	uint8_t visual_effect = VE_DEFAULT; ///< Bitstuffed NewGRF visual effect data
 	uint8_t shorten_factor = 0; ///< length on main map for this type is 8 - shorten_factor
 	RoadType roadtype{}; ///< Road type
+	uint8_t field_tasks = 0; ///< Farm fork: bitmask of #FieldTaskType this vehicle can do on fields.
 };
 
 /**

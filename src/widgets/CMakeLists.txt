@@ -1,6 +1,7 @@
 add_files(
     ai_widget.h
     airport_widget.h
+    field_widget.h
     autoreplace_widget.h
     bootstrap_widget.h
     bridge_widget.h

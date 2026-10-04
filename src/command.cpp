@@ -36,6 +36,7 @@
 #include "misc_cmd.h"
 #include "news_cmd.h"
 #include "object_cmd.h"
+#include "field_cmd.h"
 #include "order_cmd.h"
 #include "rail_cmd.h"
 #include "road_cmd.h"

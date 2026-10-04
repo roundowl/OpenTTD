@@ -74,6 +74,8 @@
 #include "tilearea_airport.h"
 #include "tilearea_airportlayout.h"
 
+#include "field_base.h"
+#include "field_func.h"
 #include "widgets/station_widget.h"
 
 #include "table/strings.h"
@@ -2088,6 +2090,11 @@ CommandCost CmdBuildRoadStop(DoCommandFlags flags, TileIndex tile, uint8_t width
 	TileArea roadstop_area(tile, width, length);
 	if (CommandCost ret = CheckStationSpread({}, roadstop_area); ret.Failed()) return ret;
 
+	/* Do not replace the entry corner of a farm field. */
+	for (TileIndex cur_tile : roadstop_area) {
+		if (IsTileType(cur_tile, TileType::Station) && Field::GetByCornerTile(cur_tile) != nullptr) return CommandCost(STR_ERROR_MUST_REMOVE_FIELD_FIRST);
+	}
+
 	if (distant_join && (!_settings_game.station.distant_join_stations || !Station::IsValidID(station_to_join))) return CMD_ERROR;
 
 	/* Trams only have drive through stops */
@@ -2208,6 +2215,17 @@ CommandCost CmdBuildRoadStop(DoCommandFlags flags, TileIndex tile, uint8_t width
 		}
 	}
 	return cost;
+}
+
+/**
+ * Remove the truck stop at the entry corner of a farm field.
+ * @param tile The entry corner tile.
+ * @param flags Operation to perform.
+ * @return The cost of this operation or an error.
+ */
+CommandCost RemoveFieldRoadStop(TileIndex tile, DoCommandFlags flags)
+{
+	return RemoveRoadStop(tile, flags);
 }
 
 /**
@@ -2418,6 +2436,12 @@ static CommandCost RemoveGenericRoadStop(DoCommandFlags flags, const TileArea &r
 	for (TileIndex cur_tile : roadstop_area) {
 		/* Make sure the specified tile is a road stop of the correct type */
 		if (!IsTileType(cur_tile, TileType::Station) || !IsAnyRoadStop(cur_tile) || IsRoadWaypoint(cur_tile) != road_waypoint) continue;
+
+		/* The entry corner of a farm field can only be removed with its field. */
+		if (Field::GetByCornerTile(cur_tile) != nullptr) {
+			last_error = CommandCost(STR_ERROR_MUST_REMOVE_FIELD_FIRST);
+			continue;
+		}
 
 		/* Save information on to-be-restored roads before the stop is removed. */
 		RoadBits road_bits{};
@@ -4886,6 +4910,11 @@ static CommandCost CanRemoveRoadWithStop(TileIndex tile, DoCommandFlags flags)
 /** @copydoc ClearTileProc */
 CommandCost ClearTile_Station(TileIndex tile, DoCommandFlags flags)
 {
+	/* The entry corner of a farm field goes together with the whole field. */
+	if (IsAnyRoadStop(tile)) {
+		if (Field *f = Field::GetByCornerTile(tile); f != nullptr) return ClearField(f, tile, flags);
+	}
+
 	if (flags.Test(DoCommandFlag::Auto)) {
 		switch (GetStationType(tile)) {
 			default: break;

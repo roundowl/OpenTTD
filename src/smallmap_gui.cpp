@@ -378,6 +378,7 @@ static const EnumIndexArray<AndOr, TileType, TileType::MaxSize> _smallmap_contou
 	AndOr(MKCOLOUR_XXXX(PC_DARK_RED), MKCOLOUR_0000), // TileType::Industry
 	AndOr(MKCOLOUR_0000, MKCOLOUR_FFFF), // TileType::TunnelBridge
 	AndOr(MKCOLOUR_0XX0(PC_DARK_RED), MKCOLOUR_F00F), // TileType::Object
+	AndOr(MKCOLOUR_0000, MKCOLOUR_FFFF), // TileType::Field
 };
 
 /** Colour masks for "Vehicles", "Industry", and "Vegetation" modes. */
@@ -393,6 +394,7 @@ static const EnumIndexArray<AndOr, TileType, TileType::MaxSize> _smallmap_vehicl
 	AndOr(MKCOLOUR_XXXX(PC_DARK_RED), MKCOLOUR_0000), // TileType::Industry
 	AndOr(MKCOLOUR_0000, MKCOLOUR_FFFF), // TileType::TunnelBridge
 	AndOr(MKCOLOUR_0XX0(PC_DARK_RED), MKCOLOUR_F00F), // TileType::Object
+	AndOr(MKCOLOUR_0000, MKCOLOUR_FFFF), // TileType::Field
 };
 
 /** Mapping of tile type to importance of the tile (higher number means more interesting to show). */
@@ -408,6 +410,7 @@ static const EnumIndexArray<uint8_t, TileType, TileType::MaxSize> _tiletype_impo
 	6, // TileType::Industry
 	8, // TileType::TunnelBridge
 	2, // TileType::Object
+	3, // TileType::Field
 };
 
 /**
@@ -571,6 +574,9 @@ static inline uint32_t GetSmallMapVegetationPixels(TileIndex tile, TileType t)
 		case TileType::Water:
 			if (IsDryCoast(tile)) return (GetTropicZone(tile) == TropicZone::Rainforest) ? MKCOLOUR_XXXX(PC_RAINFOREST) : MKCOLOUR_XXXX(PC_GRASS_LAND);
 			return ApplyMask(MKCOLOUR_XXXX(PC_GRASS_LAND), _smallmap_vehicles_andor[t]);
+
+		case TileType::Field:
+			return _vegetation_clear_bits[ClearGround::Fields];
 
 		case TileType::Industry:
 			return IsTileForestIndustry(tile) ? MKCOLOUR_XXXX(PC_GREEN) : MKCOLOUR_XXXX(PC_DARK_RED);

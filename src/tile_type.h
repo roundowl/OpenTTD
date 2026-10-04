@@ -57,6 +57,7 @@ enum class TileType : uint8_t {
 	Industry, ///< Part of an industry.
 	TunnelBridge, ///< Tunnel entry/exit and bridge heads.
 	Object, ///< Contains objects such as transmitters and owned land.
+	Field, ///< Player-built farm field (farm fork).
 	End, ///< End marker.
 	MaxSize = 1U << TILE_TYPE_BITS, ///< The maximum possible number of tile types to be stored in map.
 };

@@ -186,6 +186,13 @@ add_files(
     error.cpp
     error_func.h
     error_gui.cpp
+    field_base.h
+    field_cmd.cpp
+    field_cmd.h
+    field_func.h
+    field_gui.cpp
+    field_map.h
+    field_type.h
     fileio.cpp
     fileio_func.h
     fileio_type.h

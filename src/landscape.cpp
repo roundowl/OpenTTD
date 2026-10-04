@@ -61,7 +61,8 @@ extern const TileTypeProcs
 	_tile_type_void_procs,
 	_tile_type_industry_procs,
 	_tile_type_tunnelbridge_procs,
-	_tile_type_object_procs;
+	_tile_type_object_procs,
+	_tile_type_field_procs;
 
 /**
  * Tile callback functions for each type of tile.
@@ -80,8 +81,8 @@ const EnumIndexArray<const TileTypeProcs *, TileType, TileType::MaxSize> _tile_t
 	&_tile_type_industry_procs, // Callback functions for TileType::Industry tiles
 	&_tile_type_tunnelbridge_procs, // Callback functions for TileType::TunnelBridge tiles
 	&_tile_type_object_procs, // Callback functions for TileType::Object tiles
+	&_tile_type_field_procs, // Callback functions for TileType::Field tiles
 	/* Explicitly initialize invalid elements to make sure that they are nullptr. */
-	nullptr,
 	nullptr,
 	nullptr,
 	nullptr,

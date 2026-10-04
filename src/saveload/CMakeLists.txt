@@ -26,6 +26,7 @@ add_files(
     newgrf_sl.cpp
     newgrf_sl.h
     object_sl.cpp
+    field_sl.cpp
     oldloader.cpp
     oldloader.h
     oldloader_sl.cpp

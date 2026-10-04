@@ -409,6 +409,7 @@ STR_TOOLBAR_TOOLTIP_BUILD_ROADS                                 :{BLACK}Build ro
 STR_TOOLBAR_TOOLTIP_BUILD_TRAMWAYS                              :{BLACK}Build tramway infrastructure
 STR_TOOLBAR_TOOLTIP_BUILD_SHIP_DOCKS                            :{BLACK}Build waterway infrastructure
 STR_TOOLBAR_TOOLTIP_BUILD_AIRPORTS                              :{BLACK}Build airports
+STR_TOOLBAR_TOOLTIP_FARMING                                     :{BLACK}Build farm fields
 STR_TOOLBAR_TOOLTIP_LANDSCAPING                                 :{BLACK}Open landscaping menu, tree menu, or place a sign
 STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}Open sound/music window
 STR_TOOLBAR_TOOLTIP_SHOW_LAST_MESSAGE_NEWS                      :{BLACK}Open last message/news report, messages history or delete all messages
@@ -3047,6 +3048,10 @@ STR_STATION_BUILD_DOCK_CAPTION                                  :{WHITE}Dock
 STR_TOOLBAR_AIRCRAFT_CAPTION                                    :{WHITE}Airports
 STR_TOOLBAR_AIRCRAFT_BUILD_AIRPORT_TOOLTIP                      :{BLACK}Build airport. Ctrl+Click to select another station to join. Also press Shift to show cost estimate only
 
+# Farm toolbar
+STR_TOOLBAR_FARM_CAPTION                                        :{WHITE}Farming
+STR_TOOLBAR_FARM_BUILD_FIELD_TOOLTIP                            :{BLACK}Build a field. Start dragging on the corner that becomes the field entrance: a lorry bay that faces the adjacent road. Fields are 2x2 to 16x16 tiles. Also press Shift to show cost estimate only
+
 # Airport construction window
 STR_STATION_BUILD_AIRPORT_CAPTION                               :{WHITE}Airport Selection
 STR_STATION_BUILD_AIRPORT_TOOLTIP                               :{BLACK}Select size/type of airport
@@ -3315,6 +3320,7 @@ STR_LAI_BRIDGE_DESCRIPTION_AQUEDUCT                             :Aqueduct
 
 STR_LAI_OBJECT_DESCRIPTION_TRANSMITTER                          :Transmitter
 STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE                           :Lighthouse
+STR_LAI_FIELD_DESCRIPTION                                       :Farm field
 STR_LAI_OBJECT_DESCRIPTION_COMPANY_HEADQUARTERS                 :Company headquarters
 STR_LAI_OBJECT_DESCRIPTION_COMPANY_OWNED_LAND                   :Company-owned land
 
@@ -5217,6 +5223,7 @@ STR_ERROR_CAN_T_BUILD_PASSENGER_TRAM_STATION                    :Can't build pas
 STR_ERROR_CAN_T_BUILD_CARGO_TRAM_STATION                        :Can't build freight tram station...
 STR_ERROR_CAN_T_BUILD_DOCK_HERE                                 :Can't build dock here...
 STR_ERROR_CAN_T_BUILD_AIRPORT_HERE                              :Can't build airport here...
+STR_ERROR_CAN_T_BUILD_FIELD_HERE                                :Can't build field here...
 
 STR_ERROR_ADJOINS_MORE_THAN_ONE_EXISTING                        :adjoins more than one existing station/loading area
 STR_ERROR_STATION_TOO_SPREAD_OUT                                :station too spread out
@@ -5396,6 +5403,11 @@ STR_ERROR_TUNNEL_TOO_LONG                                       :tunnel too long
 STR_ERROR_TOO_MANY_OBJECTS                                      :too many objects
 STR_ERROR_CAN_T_BUILD_OBJECT                                    :Can't build object...
 STR_ERROR_OBJECT_IN_THE_WAY                                     :object in the way
+STR_ERROR_FIELD_IN_THE_WAY                                      :farm field in the way
+STR_ERROR_MUST_REMOVE_FIELD_FIRST                               :must remove the farm field first
+STR_ERROR_FIELD_TOO_SMALL                                       :field must be at least 2x2 tiles
+STR_ERROR_FIELD_TOO_LARGE                                       :field sides must be at most 16 tiles
+STR_ERROR_TOO_MANY_FIELDS                                       :too many farm fields
 STR_ERROR_COMPANY_HEADQUARTERS_IN                               :company headquarters in the way
 STR_ERROR_CAN_T_PURCHASE_THIS_LAND                              :Can't purchase this land area...
 STR_ERROR_YOU_ALREADY_OWN_IT                                    :you already own it!

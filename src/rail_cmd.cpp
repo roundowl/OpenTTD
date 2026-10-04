@@ -2030,6 +2030,25 @@ static void DrawTrackFence_SW(const TileInfo *ti, const PalSpriteID &psid, uint 
 }
 
 /**
+ * Draw a default rail fence along one border of a non-rail tile (used by farm fields).
+ * @param ti Tile drawing information.
+ * @param side Border to draw the fence on.
+ * @param pal The palette to apply while drawing.
+ */
+void DrawRailFenceOnBorder(const TileInfo *ti, DiagDirection side, PaletteID pal)
+{
+	PalSpriteID psid{.sprite = SPR_TRACK_FENCE_FLAT_X, .pal = pal};
+	const uint num_sprites = 8;
+	switch (side) {
+		case DiagDirection::NE: DrawTrackFence_NE(ti, psid, num_sprites); break;
+		case DiagDirection::SE: DrawTrackFence_SE(ti, psid, num_sprites); break;
+		case DiagDirection::SW: DrawTrackFence_SW(ti, psid, num_sprites); break;
+		case DiagDirection::NW: DrawTrackFence_NW(ti, psid, num_sprites); break;
+		default: NOT_REACHED();
+	}
+}
+
+/**
  * Draw track fences.
  * @param ti Tile drawing information.
  * @param rti Rail type information.

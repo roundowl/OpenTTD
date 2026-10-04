@@ -46,6 +46,12 @@
 #include "3rdparty/fmt/chrono.h"
 #include "company_cmd.h"
 #include "misc_cmd.h"
+#include "field_base.h"
+#include "field_cmd.h"
+#include "road_map.h"
+#include "tilearea_spiral.h"
+#include "town.h"
+#include "core/backup_type.hpp"
 
 #if defined(WITH_ZLIB)
 #include "network/network_content.h"
@@ -409,6 +415,79 @@ static bool ConScrollToTile(std::span<std::string_view> argv)
 	}
 
 	return false;
+}
+
+/**
+ * Farm fork debug helper: build a field, either at given tiles or at the first
+ * spot next to a town road where a 4x3 field fits.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConFarmField(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Build a farm field. Usage: 'farm_field [<corner tile> <opposite tile>]'.");
+		IConsolePrint(CC_HELP, "Without arguments, builds a 4x3 field next to a town road and scrolls to it.");
+		return true;
+	}
+	if (!Company::IsValidID(_local_company)) {
+		IConsolePrint(CC_ERROR, "No local company.");
+		return true;
+	}
+
+	if (argv.size() == 3) {
+		auto corner = ParseInteger(argv[1], 0);
+		auto other = ParseInteger(argv[2], 0);
+		if (!corner.has_value() || !other.has_value() || *corner >= Map::Size() || *other >= Map::Size()) return false;
+		bool ok = Command<Commands::BuildField>::Post(STR_ERROR_CAN_T_BUILD_FIELD_HERE, TileIndex{*other}, TileIndex{*corner}, ROADTYPE_ROAD);
+		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, ok ? "Field built." : "Field not built.");
+		return true;
+	}
+	if (argv.size() != 1) return false;
+
+	Backup<CompanyID> cur_company(_current_company, _local_company);
+	for (const Town *t : Town::Iterate()) {
+		for (TileIndex corner : SpiralTileSequence(t->xy, 25)) {
+			if (!IsTileType(corner, TileType::Clear) && !IsTileType(corner, TileType::Trees)) continue;
+			for (DiagDirection road_dir = DiagDirection::Begin; road_dir < DiagDirection::End; road_dir++) {
+				TileIndex road = TileAddByDiagDir(corner, road_dir);
+				if (!IsValidTile(road) || !IsNormalRoadTile(road)) continue;
+
+				/* Grow the field away from the road, 4 tiles along it and 3 away from it. */
+				TileIndexDiffC away = TileIndexDiffCByDiagDir(ReverseDiagDir(road_dir));
+				for (int side : {-1, 1}) {
+					TileIndexDiffC along = (DiagDirToAxis(road_dir) == Axis::X) ? TileIndexDiffC{0, static_cast<int16_t>(side)} : TileIndexDiffC{static_cast<int16_t>(side), 0};
+					TileIndex other = TileAddWrap(corner, along.x * 3 + away.x * 2, along.y * 3 + away.y * 2);
+					if (other == INVALID_TILE) continue;
+					if (Command<Commands::BuildField>::Do(DoCommandFlags{DoCommandFlag::Auto, DoCommandFlag::NoWater}, other, corner, ROADTYPE_ROAD).Failed()) continue;
+
+					cur_company.Restore();
+					bool ok = Command<Commands::BuildField>::Post(STR_ERROR_CAN_T_BUILD_FIELD_HERE, other, corner, ROADTYPE_ROAD);
+					IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "Field {} at corner {} ({}, {}) to {} ({}, {}).", ok ? "built" : "failed", corner, TileX(corner), TileY(corner), other, TileX(other), TileY(other));
+					ScrollMainWindowToTile(corner, true);
+					return true;
+				}
+			}
+		}
+	}
+	IConsolePrint(CC_ERROR, "No spot found.");
+	return true;
+}
+
+/**
+ * Farm fork debug helper: list all fields.
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConFarmList(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "List all farm fields. Usage: 'farm_list'.");
+		return true;
+	}
+	IConsolePrint(CC_DEFAULT, "{} field(s).", Field::GetNumItems());
+	for (const Field *f : Field::Iterate()) {
+		IConsolePrint(CC_DEFAULT, "  #{}: owner {}, corner {} ({}, {}), {}x{}, station {}", f->index, f->owner, f->corner, TileX(f->corner), TileY(f->corner), f->location.w, f->location.h, f->station);
+	}
+	return true;
 }
 
 /**
@@ -2985,6 +3064,8 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("script",                  ConScript);
 	IConsole::CmdRegister("zoomto",                  ConZoomToLevel);
 	IConsole::CmdRegister("scrollto",                ConScrollToTile);
+	IConsole::CmdRegister("farm_field",              ConFarmField,        ConHookNoNetwork);
+	IConsole::CmdRegister("farm_list",               ConFarmList);
 	IConsole::CmdRegister("alias",                   ConAlias);
 	IConsole::CmdRegister("load",                    ConLoad);
 	IConsole::CmdRegister("load_save",               ConLoad);

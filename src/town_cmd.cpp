@@ -1741,6 +1741,7 @@ static bool CanFollowRoad(TileIndex tile, DiagDirection dir, TownExpandModes mod
 			case TileType::House:
 			case TileType::Industry:
 			case TileType::Object:
+			case TileType::Field:
 				return false;
 
 			default:

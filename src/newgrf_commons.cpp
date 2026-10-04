@@ -376,6 +376,7 @@ uint32_t GetTerrainType(TileIndex tile, TileContext context)
 				case TileType::House:
 				case TileType::Industry:
 				case TileType::Object:
+				case TileType::Field:
 					/* These tiles usually have a levelling foundation. So use max Z */
 					has_snow = (GetTileMaxZ(tile) > GetSnowLine());
 					break;

@@ -109,11 +109,13 @@ struct RoadVehFieldWork {
 	uint16_t step = 0; ///< Index into #route of the waypoint being driven to.
 	uint16_t backtrack_from = 0; ///< Work route step at which a backtrack started.
 	int16_t segment = -1; ///< Work segment held: 0 the entry strip, 1 + j row pair j.
+	int16_t seg_start = 0; ///< Index into the segment's cells where work starts; earlier cells are already done.
 	int8_t from_u = 1; ///< Cell the current route starts from, along the short side.
 	int8_t from_v = 1; ///< Cell the current route starts from, along the long side.
 	bool advance_order = false; ///< Whether to move to the next order at the next decision point (service quarter or bay).
 	bool depot_wait = false; ///< Waiting in a depot because no field has work.
 	bool auto_unload = false; ///< Unloading at the field's station without an order for it.
+	bool gate_wait = false; ///< NOSAVE: held before a row another machine is still leaving; others drive past it.
 	uint8_t bay_trackdir = 0; ///< Track direction the vehicle entered the bay with.
 	Direction bay_direction = Direction::N; ///< Direction of the vehicle when stopped in the bay.
 	int32_t bay_x = 0; ///< World X of the bay stop position.

@@ -15,6 +15,8 @@
 #include "station_base.h"
 #include "vehicle_func.h"
 
+#include "field_func.h"
+
 #include "safeguards.h"
 
 /** The pool of roadstops. */
@@ -44,6 +46,8 @@ RoadStop *RoadStop::GetNextRoadStop(const RoadVehicle *v) const
 		if (!HasTileAnyRoadType(rs->xy, v->compatible_roadtypes)) continue;
 		/* The vehicle is articulated and can therefore not go to a standard road stop. */
 		if (IsBayRoadStopTile(rs->xy) && v->HasArticulatedPart()) continue;
+		/* Farm fork: a field's entry corner is for farm machinery only. */
+		if (IsFieldCornerClosedTo(v, rs->xy)) continue;
 
 		/* The vehicle can actually go to this road stop. So, return it! */
 		return rs;

@@ -872,6 +872,7 @@ public:
 		SaveLoad::Variable<VarFileType::U16>("field_work.step", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.step)),
 		SaveLoad::Variable<VarFileType::U16>("field_work.backtrack_from", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.backtrack_from)),
 		SaveLoad::Variable<VarFileType::I16>("field_work.segment", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.segment)),
+		SaveLoad::Variable<VarFileType::I16>("field_work.seg_start", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.seg_start)),
 		SaveLoad::Variable<VarFileType::I8>("field_work.from_u", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.from_u)),
 		SaveLoad::Variable<VarFileType::I8>("field_work.from_v", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.from_v)),
 		SaveLoad::Variable<VarFileType::Bool>("field_work.auto_unload", SLE_OBJECT_ADDRESS(RoadVehicle, field_work.auto_unload)),

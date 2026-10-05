@@ -65,6 +65,8 @@
 
 #include "table/strings.h"
 
+#include "field_func.h"
+
 #include "safeguards.h"
 
 /** @{
@@ -3173,6 +3175,12 @@ StringID GetVehicleCannotUseStationReason(const Vehicle *v, const Station *st)
 			StringID err = rv->IsBus() ? STR_ERROR_NO_BUS_STATION : STR_ERROR_NO_TRUCK_STATION;
 
 			for (; rs != nullptr; rs = rs->next) {
+				/* Farm fork: a field's entry corner is for farm machinery only. */
+				if (IsFieldCornerClosedTo(rv, rs->xy)) {
+					if (err == STR_ERROR_NO_TRUCK_STATION) err = STR_ERROR_FIELD_CORNER_FARM_MACHINERY_ONLY;
+					continue;
+				}
+
 				/* Articulated vehicles cannot use bay road stops, only drive-through. Make sure the vehicle can actually use this bay stop */
 				if (HasTileAnyRoadType(rs->xy, rv->compatible_roadtypes) && IsBayRoadStopTile(rs->xy) && rv->HasArticulatedPart()) {
 					err = STR_ERROR_NO_STOP_ARTICULATED_VEHICLE;

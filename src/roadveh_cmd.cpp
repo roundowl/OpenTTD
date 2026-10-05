@@ -1162,6 +1162,7 @@ static void RoadVehFieldSetRoute(RoadVehicle *v, FieldRouteKind kind)
 {
 	v->field_work.kind = kind;
 	v->field_work.step = 0;
+	v->field_work.gate_wait = false;
 	v->field_work.route = BuildFieldRoute(*Field::Get(v->field_work.field), v->field_work);
 }
 
@@ -1178,6 +1179,7 @@ static void RoadVehFieldStartWork(RoadVehicle *v, Field *f)
 	assert(ok == FieldWorkAvailability::Start);
 	v->field_work.task = task;
 	v->field_work.segment = segment;
+	v->field_work.seg_start = static_cast<int16_t>(GetFieldSegmentResume(*f, segment, task));
 
 	if (task == FieldTaskType::Fertilise || task == FieldTaskType::Spray) {
 		uint quarters = CountFieldSegmentEligibleQuarters(*f, segment, task);
@@ -1306,10 +1308,10 @@ static bool RoadVehFieldWorkQuarter(RoadVehicle *v, Field *f, const FieldWaypoin
 {
 	RoadVehFieldWork &w = v->field_work;
 	if (w.task == FieldTaskType::Harvest && (v->cargo.StoredCount() + GetFieldQuarterMaxYield(f->crop) > v->cargo_cap || !CargoPacket::CanAllocateItem())) {
-		/* Full: remember nothing, the unharvested quarters stay ripe. Drive back the way we came,
-		 * then on to the next order, or unload at this field if the orders have no stop for it. */
+		/* Full: give the row up and leave it over harvested ground, then unload at this field's station.
+		 * The unharvested quarters stay ripe; whoever takes the row next starts at the first of them. */
 		w.backtrack_from = w.step;
-		w.advance_order = HasStationOrder(v);
+		w.advance_order = false;
 		RoadVehFieldSetRoute(v, FieldRouteKind::Backtrack);
 		return false;
 	}
@@ -1484,6 +1486,8 @@ static bool IsFieldPathBlocked(const RoadVehicle *v, const Field *f, int dx, int
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (rv == v || rv->state != RVSB_IN_FIELD || rv->field_work.field != f->index) continue;
 		if (rv->field_work.kind == FieldRouteKind::Parked || rv->field_work.kind == FieldRouteKind::Servicing || rv->tile == f->corner) continue;
+		/* One waiting for a row to clear must not hold up the machine it waits for. */
+		if (rv->field_work.gate_wait) continue;
 
 		int ox = rv->x_pos - v->x_pos;
 		int oy = rv->y_pos - v->y_pos;
@@ -1520,7 +1524,11 @@ static bool RoadVehFieldStep(RoadVehicle *v, Field *f)
 
 	int dx = Clamp(target.x - v->x_pos, -1, 1);
 	int dy = Clamp(target.y - v->y_pos, -1, 1);
-	if (IsFieldPathBlocked(v, f, dx, dy)) {
+	/* A row someone is still leaving is entered once they are out. Wait a cell short of the lane
+	 * cell before the row, which the leaving machine crosses. */
+	bool near_entry = target.entry || (w.step + 1u < w.route.size() && w.route[w.step + 1].entry);
+	w.gate_wait = w.kind == FieldRouteKind::Work && near_entry && IsFieldRowOccupied(*f, w.segment, v);
+	if (w.gate_wait || IsFieldPathBlocked(v, f, dx, dy)) {
 		v->cur_speed = 0;
 		return false;
 	}
@@ -1921,7 +1929,7 @@ again:
 
 			/* In case an RV is stopped in a road stop, why not try to load? */
 			if (v->cur_speed == 0 && IsInsideMM(v->state, RVSB_IN_DT_ROAD_STOP, RVSB_IN_DT_ROAD_STOP_END) &&
-					v->current_order.ShouldStopAtStation(v, GetStationIndex(v->tile)) &&
+					v->current_order.ShouldStopAtStation(v, GetStationIndex(v->tile)) && !IsFieldCornerClosedTo(v, v->tile) &&
 					v->owner == GetTileOwner(v->tile) && !v->current_order.IsType(OT_LEAVESTATION) &&
 					GetRoadStopType(v->tile) == (v->IsBus() ? RoadStopType::Bus : RoadStopType::Truck)) {
 				Station *st = Station::GetByTile(v->tile);
@@ -1966,7 +1974,7 @@ again:
 	if (v->IsFrontEngine() && ((IsInsideMM(v->state, RVSB_IN_ROAD_STOP, RVSB_IN_ROAD_STOP_END) &&
 			_road_stop_stop_frame[v->state - RVSB_IN_ROAD_STOP + (to_underlying(_settings_game.vehicle.road_side) << RVS_DRIVE_SIDE)] == v->frame) ||
 			(IsInsideMM(v->state, RVSB_IN_DT_ROAD_STOP, RVSB_IN_DT_ROAD_STOP_END) &&
-			v->current_order.ShouldStopAtStation(v, GetStationIndex(v->tile)) &&
+			v->current_order.ShouldStopAtStation(v, GetStationIndex(v->tile)) && !IsFieldCornerClosedTo(v, v->tile) &&
 			v->owner == GetTileOwner(v->tile) &&
 			GetRoadStopType(v->tile) == (v->IsBus() ? RoadStopType::Bus : RoadStopType::Truck) &&
 			v->frame == RVC_DRIVE_THROUGH_STOP_FRAME))) {

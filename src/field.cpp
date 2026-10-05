@@ -99,7 +99,7 @@ static bool IsQuarterEligible(FieldTaskType type, TileIndex tile, uint quarter)
 		case FieldTaskType::Fertilise:
 		case FieldTaskType::Spray:
 			return stage >= FieldStage::Cultivated && stage <= FieldStage::Maturing && !IsFieldQuarterTreated(tile, quarter, type == FieldTaskType::Spray);
-		case FieldTaskType::Harvest: return stage >= FieldStage::Ripe;
+		case FieldTaskType::Harvest: return stage == FieldStage::Ripe || stage == FieldStage::Overripe; // Withered: cultivate it.
 		default: NOT_REACHED();
 	}
 }
@@ -335,13 +335,11 @@ int Field::WorkQuarter(TileIndex tile, uint quarter, FieldTaskType type)
 			break;
 
 		case FieldTaskType::Harvest: {
-			if (GetFieldQuarterStage(tile, quarter) != FieldStage::Withered) {
-				uint percent = 80 + (IsFieldQuarterTreated(tile, quarter, false) ? 20 : 0) + (IsFieldQuarterTreated(tile, quarter, true) ? 20 : 0);
-				uint points = GetCropYield(this->crop) * percent + this->harvest_remainder;
-				produced = points / 100;
-				this->harvest_remainder = points % 100;
-				this->last_harvest += produced;
-			}
+			uint percent = 80 + (IsFieldQuarterTreated(tile, quarter, false) ? 20 : 0) + (IsFieldQuarterTreated(tile, quarter, true) ? 20 : 0);
+			uint points = GetCropYield(this->crop) * percent + this->harvest_remainder;
+			produced = points / 100;
+			this->harvest_remainder = points % 100;
+			this->last_harvest += produced;
 			SetFieldQuarterStage(tile, quarter, FieldStage::Fallow);
 			SetFieldQuarterTreated(tile, quarter, false, false);
 			SetFieldQuarterTreated(tile, quarter, true, false);
@@ -388,6 +386,15 @@ struct FieldFrame {
 		this->lv = 2 * (this->u_is_x ? f.location.h : f.location.w);
 	}
 
+	/** Cell (u, v) containing world point (x, y); may lie outside the field. */
+	std::pair<int, int> CellOf(int x, int y) const
+	{
+		auto floor_div8 = [](int a) { return a >= 0 ? a / 8 : -((-a + 7) / 8); };
+		int ax = this->sx > 0 ? floor_div8(x - this->x0) : floor_div8(this->x0 + 15 - x);
+		int ay = this->sy > 0 ? floor_div8(y - this->y0) : floor_div8(this->y0 + 15 - y);
+		return this->u_is_x ? std::pair{ax, ay} : std::pair{ay, ax};
+	}
+
 	/** World coordinates of the centre of cell (u, v). */
 	FieldWaypoint Centre(int u, int v, bool work) const
 	{
@@ -402,6 +409,7 @@ struct FieldCell {
 	int u;
 	int v;
 	bool work;
+	int idx = -1; ///< Index into the work segment's cells, or -1 for lane cells outside it.
 
 	bool Is(int u, int v) const { return this->u == u && this->v == v; }
 };
@@ -413,13 +421,14 @@ static constexpr FieldCell FIELD_SERVICE_CELL{0, 2, false};
 struct FieldPathBuilder {
 	std::vector<FieldCell> cells;
 
-	void Add(int u, int v, bool work)
+	void Add(int u, int v, bool work, int idx = -1)
 	{
 		if (!this->cells.empty() && this->cells.back().Is(u, v)) {
 			this->cells.back().work |= work;
+			if (idx >= 0) this->cells.back().idx = idx;
 			return;
 		}
-		this->cells.push_back({u, v, work});
+		this->cells.push_back({u, v, work, idx});
 	}
 
 	const FieldCell &Last() const { return this->cells.back(); }
@@ -525,14 +534,24 @@ static std::vector<FieldCell> GetFieldSegmentCells(const FieldFrame &fr, int seg
 	return cells;
 }
 
-/** Cells of a work route: from the vehicle's start cell to the segment, then the segment. */
+/**
+ * Cells of a work route: from the vehicle's start cell to the segment, then the segment.
+ * Work starting part way along (#RoadVehFieldWork::seg_start) is reached up the outbound half
+ * without working; a start on the return half is one quarter sideways from the outbound half,
+ * not round the far end.
+ */
 static std::vector<FieldCell> GetFieldWorkCells(const FieldFrame &fr, const RoadVehFieldWork &work)
 {
 	FieldPathBuilder pb;
 	pb.Add(work.from_u, work.from_v, false);
 	auto segment = GetFieldSegmentCells(fr, work.segment);
+	int n = static_cast<int>(segment.size());
+	int start = Clamp<int>(work.seg_start, 0, n - 1);
+	/* Both halves have n / 2 cells; cell i of the return half lies beside cell n - 1 - i of the outbound half. */
+	int approach = start < n / 2 ? start - 1 : n - 1 - start;
 	pb.Transit(segment.front());
-	pb.AddCells(segment);
+	for (int i = 0; i <= approach; i++) pb.Add(segment[i].u, segment[i].v, false, i);
+	for (int i = start; i < n; i++) pb.Add(segment[i].u, segment[i].v, true, i);
 	return pb.cells;
 }
 
@@ -552,19 +571,33 @@ std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWor
 
 	switch (work.kind) {
 		case FieldRouteKind::Work:
-			for (const auto &c : GetFieldWorkCells(fr, work)) route.push_back(fr.Centre(c.u, c.v, c.work));
+			for (const auto &c : GetFieldWorkCells(fr, work)) {
+				route.push_back(fr.Centre(c.u, c.v, c.work));
+				route.back().entry = c.idx == 0 && work.segment >= 1;
+			}
 			break;
 
 		case FieldRouteKind::Backtrack:
 		case FieldRouteKind::ToCorner: {
 			FieldPathBuilder pb;
 			if (work.kind == FieldRouteKind::Backtrack) {
-				/* Back along the worked part of the segment to its start, then the usual way out. */
+				/* Out of the segment over worked ground, then the usual way out. */
 				auto cells = GetFieldWorkCells(fr, work);
-				int from = std::min<int>(work.backtrack_from, static_cast<int>(cells.size()) - 1);
-				int start = static_cast<int>(cells.size() - GetFieldSegmentCells(fr, work.segment).size());
-				pb.Add(cells[from].u, cells[from].v, false);
-				for (int i = from - 1; i >= start; i--) pb.Add(cells[i].u, cells[i].v, false);
+				auto segment = GetFieldSegmentCells(fr, work.segment);
+				int n = static_cast<int>(segment.size());
+				const FieldCell &here = cells[std::min<int>(work.backtrack_from, static_cast<int>(cells.size()) - 1)];
+				pb.Add(here.u, here.v, false);
+				if (here.idx >= n / 2) {
+					/* On the return half of a row: one quarter sideways onto the worked outbound half, and
+					 * down it. The strip's return half is the outbound lane already: straight on. */
+					if (work.segment != 0) {
+						for (int i = n - 1 - here.idx; i >= 0; i--) pb.Add(segment[i].u, segment[i].v, false);
+					}
+				} else if (here.idx >= 0) {
+					/* On the outbound half: back the way it came. */
+					for (int i = here.idx - 1; i >= 0; i--) pb.Add(segment[i].u, segment[i].v, false);
+				}
+				/* Still on the way in (idx -1): turn round where it is. */
 			} else {
 				pb.Add(work.from_u, work.from_v, false);
 			}
@@ -670,7 +703,10 @@ uint CountFieldSegmentEligibleQuarters(const Field &f, int segment, FieldTaskTyp
 }
 
 /**
- * Is a segment held by a vehicle working or backing out of it?
+ * Is a segment held by a vehicle working it?
+ * A machine leaving a row (full, or orders changed) gives it up at once, so the next machine can
+ * set off; it waits at the row's first cell until the row is clear (#IsFieldRowOccupied). The
+ * entry strip stays held until the machine is out, since its lanes are everyone's way in.
  * @param f The field.
  * @param segment The segment.
  * @param self The vehicle asking, which does not count.
@@ -681,9 +717,64 @@ static bool IsFieldSegmentReserved(const Field &f, int segment, const RoadVehicl
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (rv == self || rv->state != RVSB_IN_FIELD || rv->field_work.field != f.index) continue;
 		if (rv->field_work.segment != segment) continue;
-		if (rv->field_work.kind == FieldRouteKind::Work || rv->field_work.kind == FieldRouteKind::Backtrack) return true;
+		if (rv->field_work.kind == FieldRouteKind::Work) return true;
+		if (rv->field_work.kind == FieldRouteKind::Backtrack && segment == 0) return true;
 	}
 	return false;
+}
+
+/**
+ * Is another machine still inside a row pair, e.g. one leaving it full?
+ * @param f The field.
+ * @param segment The segment; the entry strip (0) never counts as occupied.
+ * @param self The vehicle asking, which does not count.
+ * @return True if another machine of this field is on one of the row pair's cells.
+ */
+bool IsFieldRowOccupied(const Field &f, int segment, const RoadVehicle *self)
+{
+	if (segment < 1) return false;
+	FieldFrame fr(f);
+	int j = segment - 1;
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (rv == self || rv->state != RVSB_IN_FIELD || rv->field_work.field != f.index) continue;
+		auto [u, v] = fr.CellOf(rv->x_pos, rv->y_pos);
+		if (u >= 2 && (v == 2 * j || v == 2 * j + 1)) return true;
+	}
+	return false;
+}
+
+/**
+ * Where work on a segment starts: its first cell the task can still be done on.
+ * @param f The field.
+ * @param segment The segment.
+ * @param type The task.
+ * @return Index into the segment's cells; 0 if none is eligible.
+ */
+int GetFieldSegmentResume(const Field &f, int segment, FieldTaskType type)
+{
+	FieldFrame fr(f);
+	auto cells = GetFieldSegmentCells(fr, segment);
+	for (int i = 0; i < static_cast<int>(cells.size()); i++) {
+		FieldWaypoint wp = fr.Centre(cells[i].u, cells[i].v, false);
+		TileIndex tile = TileVirtXY(wp.x, wp.y);
+		if (!IsTileType(tile, TileType::Field) || GetFieldIndex(tile) != f.index) continue;
+		uint quarter = ((wp.y & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 2 : 0) | ((wp.x & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 1 : 0);
+		if (IsQuarterEligible(type, tile, quarter)) return i;
+	}
+	return 0;
+}
+
+/**
+ * Is a road stop tile a field's entry corner that this vehicle may not stop at?
+ * Entry corners belong to farm machinery; other road vehicles load the field's cargo at another
+ * stop of the same station.
+ * @param v The road vehicle.
+ * @param tile The road stop tile.
+ * @return True if \a v must not use the stop.
+ */
+bool IsFieldCornerClosedTo(const RoadVehicle *v, TileIndex tile)
+{
+	return IsTileType(tile, TileType::Station) && Field::GetByCornerTile(tile) != nullptr && !IsFieldMachine(v);
 }
 
 /**
@@ -783,16 +874,6 @@ bool IsFieldMachineIdle(const RoadVehicle *v)
 }
 
 /**
- * Does a vehicle have any order to stop at a station, i.e. somewhere to deliver cargo?
- * @param v The vehicle.
- * @return True if so.
- */
-bool HasStationOrder(const Vehicle *v)
-{
-	return std::ranges::any_of(v->Orders(), [](const Order &o) { return o.IsType(OT_GOTO_STATION); });
-}
-
-/**
  * Decide what a farm vehicle does at the entry corner of a field.
  * Does not change any vehicle state.
  * @param v The vehicle.
@@ -801,16 +882,19 @@ bool HasStationOrder(const Vehicle *v)
  */
 FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f)
 {
-	if (!v->current_order.IsType(OT_WORK_FIELD) || v->current_order.GetDestination() != f->station) return FieldCornerAction::Leave;
+	/* A harvester leaves a field empty: its load goes to the field's station for trucks to collect.
+	 * Driving it to a station of the orders could take a month on a bad route. */
+	bool ordered_here = v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station;
+	FieldWorkAvailability availability = ordered_here ? CanStartFieldWork(v, f, nullptr, nullptr) : FieldWorkAvailability::None;
+	if (availability != FieldWorkAvailability::Start && v->cargo.StoredCount() > 0 && CanFieldMachineDo(v, FieldTaskType::Harvest)) return FieldCornerAction::Unload;
 
-	switch (CanStartFieldWork(v, f, nullptr, nullptr)) {
+	if (!ordered_here) return FieldCornerAction::Leave;
+
+	switch (availability) {
 		case FieldWorkAvailability::Start: return FieldCornerAction::StartWork;
 		case FieldWorkAvailability::Busy: return FieldCornerAction::Park; // Wait for the other machines.
 		case FieldWorkAvailability::None: break;
 	}
-
-	/* A load with nowhere to go in the orders is delivered to this field's own station. */
-	if (v->cargo.StoredCount() > 0 && !HasStationOrder(v)) return FieldCornerAction::Unload;
 
 	/* Nothing to do here. With other kinds of orders, carry on with them. */
 	bool only_fields = true;

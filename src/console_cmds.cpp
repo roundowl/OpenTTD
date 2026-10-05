@@ -48,6 +48,8 @@
 #include "misc_cmd.h"
 #include "field_base.h"
 #include "field_cmd.h"
+#include "station_cmd.h"
+#include "newgrf_roadstop.h"
 #include "field_map.h"
 #include "engine_base.h"
 #include "engine_func.h"
@@ -565,6 +567,26 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 		return true;
 	}
 
+	/* Lorries load at a drive-through stop of their own beside the corner, joined to the field's station:
+	 * the entry corner is for farm machinery only. */
+	if (lorries > 0) {
+		bool built = false;
+		for (TileIndex t : SpiralTileSequence(f->corner, 4)) {
+			if (!IsNormalRoadTile(t) || f->location.Contains(t)) continue;
+			for (DiagDirection dir : {DiagDirection::NE, DiagDirection::SE}) {
+				auto build = [&](DoCommandFlags flags) {
+					return Command<Commands::BuildRoadStop>::Do(flags, t, 1, 1, RoadStopType::Truck, true, dir, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, f->station, true);
+				};
+				if (build(DoCommandFlag::Auto).Failed()) continue;
+				build({DoCommandFlag::Execute, DoCommandFlag::Auto});
+				built = true;
+				break;
+			}
+			if (built) break;
+		}
+		if (!built) IConsolePrint(CC_ERROR, "No spot for the lorry stop; lorries cannot load.");
+	}
+
 	std::vector<uint> machines(tractors, 88u);
 	machines.insert(machines.end(), harvesters, 89u);
 	machines.insert(machines.end(), lorries, 25u); // Hereford Grain Truck
@@ -593,9 +615,10 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 			continue;
 		}
 		if (local_id == 25) {
-			/* Lorry: collect at the field, take it back to the depot area; tests turning in the dead-end stop. */
+			/* Lorry: full load at the field's station (its own stop, not the corner), back to the depot area. */
 			Order load;
 			load.MakeGoToStation(f->station);
+			load.SetLoadType(OrderLoadType::FullLoadAny);
 			load.SetStopLocation(OrderStopLocation::FarEnd);
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, load);
 			Order home;
@@ -607,19 +630,10 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 		Order order;
 		order.MakeWorkField(f->station);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, order);
-		if (local_id == 89) {
-			/* The harvester drops its load at the field's own station for lorries to collect. */
-			Order unload;
-			unload.MakeGoToStation(f->station);
-			unload.SetUnloadType(OrderUnloadType::Transfer);
-			unload.SetLoadType(OrderLoadType::NoLoad);
-			unload.SetStopLocation(OrderStopLocation::FarEnd);
-			if (Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, unload).Failed()) IConsolePrint(CC_ERROR, "Unload order rejected.");
-		}
-		/* Back to the depot after each round, as players tend to do. */
+		/* Harvesters unload at the field by themselves. Back to the depot after each round, as players tend to do. */
 		Order to_depot;
 		to_depot.MakeGoToDepot(GetDepotIndex(depot), OrderDepotTypeFlag::PartOfOrders, {});
-		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, local_id == 89 ? 2 : 1, to_depot);
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, to_depot);
 		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
 		IConsolePrint(CC_DEFAULT, "Vehicle {} built in depot {} and sent to work on field {}.", veh, depot, f->index);
 	}

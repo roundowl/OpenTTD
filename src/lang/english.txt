@@ -5455,6 +5455,7 @@ STR_ERROR_CAN_T_BUILD_OBJECT                                    :Can't build obj
 STR_ERROR_OBJECT_IN_THE_WAY                                     :object in the way
 STR_ERROR_FIELD_IN_THE_WAY                                      :farm field in the way
 STR_ERROR_MUST_REMOVE_FIELD_FIRST                               :must remove the farm field first
+STR_ERROR_FIELD_CORNER_FARM_MACHINERY_ONLY                      :A field entry corner is for farm machinery only. Build a truck stop next to it, joined to its station
 STR_ERROR_FIELD_TOO_SMALL                                       :field must be at least 2x2 tiles
 STR_ERROR_FIELD_TOO_LARGE                                       :field sides must be at most 16 tiles
 STR_ERROR_TOO_MANY_FIELDS                                       :too many farm fields

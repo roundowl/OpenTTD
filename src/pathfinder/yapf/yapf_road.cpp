@@ -12,6 +12,8 @@
 #include "yapf_node_road.hpp"
 #include "../../roadstop_base.h"
 
+#include "../../field_func.h"
+
 #include "../../safeguards.h"
 
 
@@ -232,10 +234,12 @@ protected:
 	StationID dest_station;
 	StationType station_type;
 	bool non_artic;
+	const RoadVehicle *vehicle = nullptr; ///< Farm fork: the vehicle, to keep others out of field entry corners.
 
 public:
 	void SetDestination(const RoadVehicle *v)
 	{
+		this->vehicle = v;
 		if (v->current_order.IsType(OT_GOTO_STATION) || v->current_order.IsType(OT_WORK_FIELD)) {
 			/* Farm fork: field orders head for the truck bay at the field's entry corner. */
 			this->dest_station = v->current_order.GetDestination().ToStationID();
@@ -282,7 +286,8 @@ public:
 			return IsTileType(tile, TileType::Station) &&
 				GetStationIndex(tile) == this->dest_station &&
 				(this->station_type == GetStationType(tile)) &&
-				(this->non_artic || IsDriveThroughStopTile(tile));
+				(this->non_artic || IsDriveThroughStopTile(tile)) &&
+				(this->vehicle == nullptr || !IsFieldCornerClosedTo(this->vehicle, tile));
 		}
 
 		return tile == this->dest_tile && this->dest_trackdirs.Test(td);

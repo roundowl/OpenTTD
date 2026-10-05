@@ -24,7 +24,7 @@ enum class FieldCornerAction : uint8_t {
 	StartWork, ///< Drive a work route.
 	Park, ///< Wait on the service quarter; only field orders and no work anywhere.
 	MoveOn, ///< Advance to the next order and leave.
-	Unload, ///< Unload the harvest at this field's own station; the orders have no other place for it.
+	Unload, ///< Unload the harvest at this field's own station; harvesters never leave a field loaded.
 	Leave, ///< The current order is elsewhere; just leave.
 };
 
@@ -44,9 +44,11 @@ std::pair<int, int> GetFieldSegmentEnd(const Field &f, int segment);
 bool IsFieldServiceQuarter(const Field &f, int x, int y);
 int GetFieldSegmentCount(const Field &f);
 uint CountFieldSegmentEligibleQuarters(const Field &f, int segment, FieldTaskType type);
+int GetFieldSegmentResume(const Field &f, int segment, FieldTaskType type);
+bool IsFieldRowOccupied(const Field &f, int segment, const RoadVehicle *self);
+bool IsFieldCornerClosedTo(const RoadVehicle *v, TileIndex tile);
 FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f);
 bool IsFieldMachineIdle(const RoadVehicle *v);
-bool HasStationOrder(const Vehicle *v);
 bool CanFieldMachineDo(const Vehicle *v, FieldTaskType type);
 
 CommandCost ClearField(Field *f, TileIndex tile, DoCommandFlags flags);

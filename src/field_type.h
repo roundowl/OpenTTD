@@ -42,7 +42,7 @@ enum class FieldTaskType : uint8_t {
 	Sow, ///< Cultivated ground becomes sown.
 	Fertilise, ///< Bonus yield for cultivated or growing ground.
 	Spray, ///< Bonus yield for cultivated or growing ground.
-	Harvest, ///< Ripe crops become cargo; withered ones are cleared. Ground becomes fallow.
+	Harvest, ///< Ripe crops become cargo and the ground fallow. Withered crops are left to the cultivator.
 	End, ///< End marker.
 };
 
@@ -74,6 +74,7 @@ struct FieldWaypoint {
 	int32_t x = 0; ///< World X coordinate.
 	int32_t y = 0; ///< World Y coordinate.
 	bool work = false; ///< Whether the quarter at this point is worked when the vehicle leaves it.
+	bool entry = false; ///< First cell of a row: wait before driving onto it while another machine is still in the row.
 };
 
 static const uint FIELD_MAX_TASKS = 32; ///< Maximum length of a field's task plan.

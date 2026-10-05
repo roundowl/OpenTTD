@@ -1327,6 +1327,8 @@ static bool RoadVehFieldWorkQuarter(RoadVehicle *v, Field *f, const FieldWaypoin
 	return true;
 }
 
+static bool RoadVehFieldDecide(RoadVehicle *v, Field *f);
+
 /**
  * Handle a field vehicle that reached the last waypoint of its route.
  * @param v The vehicle.
@@ -1339,6 +1341,8 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 	switch (w.kind) {
 		case FieldRouteKind::ToPark:
 			w.kind = FieldRouteKind::Parked;
+			w.from_u = 0;
+			w.from_v = 2;
 			[[fallthrough]];
 		case FieldRouteKind::Parked:
 			v->cur_speed = 0;
@@ -1347,6 +1351,8 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 		case FieldRouteKind::ToService:
 			/* Stop at the field's station from here, keeping the bay free. */
 			w.kind = FieldRouteKind::Servicing;
+			w.from_u = 0;
+			w.from_v = 2;
 			v->cur_speed = 0;
 			if (w.auto_unload) {
 				/* Not an order of the vehicle: hand the harvest over to the station for others to collect. */
@@ -1383,10 +1389,23 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 			break;
 	}
 
-	/* At the entry corner. */
+	return RoadVehFieldDecide(v, f);
+}
+
+/**
+ * Decide what a field vehicle does next, at the bay of the entry corner, on the corner cell or on the service quarter.
+ * @param v The vehicle.
+ * @param f The field.
+ * @return False if the vehicle cannot move on this tick.
+ */
+static bool RoadVehFieldDecide(RoadVehicle *v, Field *f)
+{
+	RoadVehFieldWork &w = v->field_work;
+	bool at_service = IsFieldServiceQuarter(*f, v->x_pos, v->y_pos);
+	bool at_bay = v->x_pos == w.bay_x && v->y_pos == w.bay_y;
 	w.segment = -1;
-	w.from_u = 1;
-	w.from_v = 1;
+	w.from_u = at_service ? 0 : 1;
+	w.from_v = at_service ? 2 : 1;
 	if (w.advance_order) {
 		w.advance_order = false;
 		if (v->current_order.IsType(OT_WORK_FIELD) && v->current_order.GetDestination() == f->station) RoadVehFieldAdvanceOrder(v);
@@ -1426,11 +1445,15 @@ static bool RoadVehFieldRouteEnd(RoadVehicle *v, Field *f)
 				RoadVehFieldSetRoute(v, FieldRouteKind::ToService);
 				return true;
 			}
-			if (!RoadVehFieldExitToBay(v, f)) break;
+			if (!at_bay) {
+				/* Out through the bay; deciding there again finds the order is elsewhere. */
+				RoadVehFieldSetRoute(v, FieldRouteKind::FromPark);
+				return true;
+			}
+			RoadVehFieldExitToBay(v, f);
 			return false;
 	}
-	v->cur_speed = 0;
-	return false;
+	NOT_REACHED();
 }
 
 /** World movement per step for each #Direction. */
@@ -1543,19 +1566,22 @@ static bool RoadVehFieldController(RoadVehicle *v)
 		RoadVehFieldSetRoute(v, FieldRouteKind::Backtrack);
 	}
 
-	if (v->current_order.IsType(OT_LEAVESTATION)) v->current_order.Free();
+	if (v->current_order.IsType(OT_LEAVESTATION)) {
+		v->current_order.Free();
+		ProcessOrders(v);
+	}
 	if (w.kind == FieldRouteKind::Servicing) {
-		/* Done loading or unloading: back to the corner to see what is next. */
-		RoadVehFieldSetRoute(v, FieldRouteKind::FromPark);
+		/* Done loading or unloading: see what is next from right here. */
+		RoadVehFieldDecide(v, f);
 	}
 
 	if (w.kind == FieldRouteKind::Parked) {
 		v->cur_speed = 0;
-		if ((v->tick_counter & 0x3F) == 0 && EvaluateFieldCorner(v, f) != FieldCornerAction::Park) {
-			RoadVehFieldSetRoute(v, FieldRouteKind::FromPark);
+		if ((v->tick_counter & 0x3F) == 0 && EvaluateFieldCorner(v, f) != FieldCornerAction::Park) RoadVehFieldDecide(v, f);
+		if (w.kind == FieldRouteKind::Parked) {
+			v->SetLastSpeed();
+			return true;
 		}
-		v->SetLastSpeed();
-		return true;
 	}
 
 	v->ShowVisualEffect();

@@ -59,12 +59,12 @@ enum class FieldTaskAction : uint8_t {
 
 /** What a vehicle inside a field is doing; selects the route it follows. */
 enum class FieldRouteKind : uint8_t {
-	Work, ///< Doing a task, from the entry corner round the field back to it.
-	Backtrack, ///< Driving the work route backwards to the entry corner (full, or orders changed).
+	Work, ///< Driving to a segment and working it.
+	Backtrack, ///< Driving back along the worked part of a segment, then out like #ToCorner (full, or orders changed).
 	ToPark, ///< Driving from the entry corner to the service quarter.
 	Parked, ///< Waiting on the service quarter for work.
-	FromPark, ///< Driving from the service quarter to the entry corner.
-	ToCorner, ///< Driving from the end of a segment to the entry corner.
+	FromPark, ///< Driving out to the bay of the entry corner, to leave the field.
+	ToCorner, ///< Driving from the end of a segment to the service quarter, or to the corner cell if the way out does not pass it.
 	ToService, ///< Driving from the entry corner to the service quarter to load or unload there.
 	Servicing, ///< Loading or unloading on the service quarter, for an order to the field's own station.
 };

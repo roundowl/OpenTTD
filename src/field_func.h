@@ -41,6 +41,7 @@ enum class FieldWorkAvailability : uint8_t {
 
 FieldWorkAvailability CanStartFieldWork(const RoadVehicle *v, Field *f, FieldTaskType *task, int *segment);
 std::pair<int, int> GetFieldSegmentEnd(const Field &f, int segment);
+bool IsFieldServiceQuarter(const Field &f, int x, int y);
 int GetFieldSegmentCount(const Field &f);
 uint CountFieldSegmentEligibleQuarters(const Field &f, int segment, FieldTaskType type);
 FieldCornerAction EvaluateFieldCorner(const RoadVehicle *v, Field *f);

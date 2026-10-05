@@ -406,8 +406,8 @@ struct FieldCell {
 	bool Is(int u, int v) const { return this->u == u && this->v == v; }
 };
 
-/** The corner cell all routes start from and end at. */
-static constexpr FieldCell FIELD_CORNER_CELL{1, 1, false};
+/** The service quarter: the first cell of the outer lane beyond the corner tile, where machines wait, load and unload. */
+static constexpr FieldCell FIELD_SERVICE_CELL{0, 2, false};
 
 /** Builder of a list of cells to drive through. */
 struct FieldPathBuilder {
@@ -448,19 +448,16 @@ struct FieldPathBuilder {
 		if (from.v == 0) {
 			this->Add(1, 0, false);
 		} else if (from.v == 1) {
-			/* End of the inner headland, (2, 1): next to the corner. */
+			/* End of row pair 0, (2, 1): next to the corner. */
 		} else {
+			/* Across to the outer lane and down it, past the service quarter. */
 			if (from.u >= 2) this->Add(1, from.v, false);
-			if (from.u >= 1 && from.v >= 3) this->Add(0, from.v, false);
-			from = this->Last();
-			if (from.u == 0) {
-				for (int v = from.v - 1; v >= 1; v--) this->Add(0, v, false);
-			}
+			for (int v = from.v; v >= 1; v--) this->Add(0, v, false);
 		}
 		this->Add(1, 1, false);
 	}
 
-	/** From the end of one row pair to the start of another along the short headland. */
+	/** From the end of one row pair to the start of another along the entry strip. */
 	void RowToRow(int to_v)
 	{
 		FieldCell from = this->Last();
@@ -481,9 +478,10 @@ struct FieldPathBuilder {
 	{
 		FieldCell from = this->Last();
 		if (from.Is(to.u, to.v)) return;
-		if (from.Is(0, 2) && to.Is(1, 2)) {
-			/* End of the outer headland straight onto the inner one. */
-			this->Add(1, 2, false);
+		if (from.Is(FIELD_SERVICE_CELL.u, FIELD_SERVICE_CELL.v) && to.v >= 2) {
+			/* From the service quarter straight across onto the inbound lane, without going round the corner. */
+			for (int v = 2; v <= to.v; v++) this->Add(1, v, false);
+			this->Add(to.u, to.v, false);
 			return;
 		}
 		if (from.u == 2 && from.v >= 3 && to.u == 2 && to.v >= 2) {
@@ -542,8 +540,9 @@ static std::vector<FieldCell> GetFieldWorkCells(const FieldFrame &fr, const Road
  * Build the route of a vehicle inside a field.
  * @param f The field.
  * @param work The vehicle's field state.
- * @return Waypoints; the last one is the bay, the end of the segment for #FieldRouteKind::Work,
- *         or the service quarter for #FieldRouteKind::ToPark.
+ * @return Waypoints; the last one is the end of the segment for #FieldRouteKind::Work, the bay for
+ *         #FieldRouteKind::FromPark, the service quarter for routes that pass it or wait there,
+ *         and the corner cell (1, 1) otherwise.
  */
 std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWork &work)
 {
@@ -556,23 +555,26 @@ std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWor
 			for (const auto &c : GetFieldWorkCells(fr, work)) route.push_back(fr.Centre(c.u, c.v, c.work));
 			break;
 
-		case FieldRouteKind::Backtrack: {
-			auto cells = GetFieldWorkCells(fr, work);
-			int from = std::min<int>(work.backtrack_from, static_cast<int>(cells.size()) - 1);
-			FieldPathBuilder pb;
-			for (int i = from; i >= 0; i--) pb.Add(cells[i].u, cells[i].v, false);
-			pb.ToCorner();
-			for (const auto &c : pb.cells) route.push_back(fr.Centre(c.u, c.v, false));
-			route.push_back(bay);
-			break;
-		}
-
+		case FieldRouteKind::Backtrack:
 		case FieldRouteKind::ToCorner: {
 			FieldPathBuilder pb;
-			pb.Add(work.from_u, work.from_v, false);
+			if (work.kind == FieldRouteKind::Backtrack) {
+				/* Back along the worked part of the segment to its start, then the usual way out. */
+				auto cells = GetFieldWorkCells(fr, work);
+				int from = std::min<int>(work.backtrack_from, static_cast<int>(cells.size()) - 1);
+				int start = static_cast<int>(cells.size() - GetFieldSegmentCells(fr, work.segment).size());
+				pb.Add(cells[from].u, cells[from].v, false);
+				for (int i = from - 1; i >= start; i--) pb.Add(cells[i].u, cells[i].v, false);
+			} else {
+				pb.Add(work.from_u, work.from_v, false);
+			}
 			pb.ToCorner();
-			for (const auto &c : pb.cells) route.push_back(fr.Centre(c.u, c.v, false));
-			route.push_back(bay);
+			/* Stop on the service quarter if the way passes it, else on the corner cell: the machine
+			 * decides there whether to unload, wait, work on or leave. Only leaving needs the bay. */
+			for (const auto &c : pb.cells) {
+				route.push_back(fr.Centre(c.u, c.v, false));
+				if (c.Is(FIELD_SERVICE_CELL.u, FIELD_SERVICE_CELL.v)) break;
+			}
 			break;
 		}
 
@@ -580,14 +582,18 @@ std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWor
 		case FieldRouteKind::Parked:
 		case FieldRouteKind::ToService:
 		case FieldRouteKind::Servicing:
-			route.push_back(fr.Centre(1, 1, false));
-			route.push_back(fr.Centre(0, 1, false));
-			route.push_back(fr.Centre(0, 2, false));
+			if (!(work.from_u == FIELD_SERVICE_CELL.u && work.from_v == FIELD_SERVICE_CELL.v)) {
+				route.push_back(fr.Centre(1, 1, false));
+				route.push_back(fr.Centre(0, 1, false));
+			}
+			route.push_back(fr.Centre(FIELD_SERVICE_CELL.u, FIELD_SERVICE_CELL.v, false));
 			break;
 
 		case FieldRouteKind::FromPark:
-			route.push_back(fr.Centre(0, 1, false));
-			route.push_back(fr.Centre(1, 1, false));
+			if (work.from_u == FIELD_SERVICE_CELL.u && work.from_v == FIELD_SERVICE_CELL.v) {
+				route.push_back(fr.Centre(0, 1, false));
+				route.push_back(fr.Centre(1, 1, false));
+			}
 			route.push_back(bay);
 			break;
 	}
@@ -597,7 +603,7 @@ std::vector<FieldWaypoint> BuildFieldRoute(const Field &f, const RoadVehFieldWor
 /**
  * Number of work segments of a field.
  * @param f The field.
- * @return Two headland passes plus one per interior row pair.
+ * @return The entry strip plus one per row pair.
  */
 int GetFieldSegmentCount(const Field &f)
 {
@@ -615,6 +621,19 @@ std::pair<int, int> GetFieldSegmentEnd(const Field &f, int segment)
 	FieldFrame fr(f);
 	FieldCell end = GetFieldSegmentCells(fr, segment).back();
 	return {end.u, end.v};
+}
+
+/**
+ * Is a vehicle standing on the service quarter of a field?
+ * @param f The field.
+ * @param x World X of the vehicle.
+ * @param y World Y of the vehicle.
+ * @return True if (x, y) is the centre of the service quarter.
+ */
+bool IsFieldServiceQuarter(const Field &f, int x, int y)
+{
+	FieldWaypoint wp = FieldFrame(f).Centre(FIELD_SERVICE_CELL.u, FIELD_SERVICE_CELL.v, false);
+	return wp.x == x && wp.y == y;
 }
 
 /**

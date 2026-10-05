@@ -461,6 +461,7 @@ static Field *AutoBuildField(int along_len, int away_len)
 			}
 		}
 	}
+	cur_company.Restore();
 	IConsolePrint(CC_ERROR, "No spot found.");
 	return nullptr;
 }
@@ -541,7 +542,7 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 	Field *f = AutoBuildField(arg(3, 4), arg(4, 3));
 	if (f == nullptr) return true;
 
-	Backup<CompanyID> cur_company(_current_company, _local_company);
+	AutoRestoreBackup cur_company(_current_company, _local_company);
 
 	/* A depot next to a road, close to the field. */
 	TileIndex depot = INVALID_TILE;
@@ -597,7 +598,7 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 		order.MakeWorkField(f->station);
 		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, order);
 		if (local_id == 89) {
-			/* The harvester drops its load at the field's own bay for lorries to collect. */
+			/* The harvester drops its load at the field's own station for lorries to collect. */
 			Order unload;
 			unload.MakeGoToStation(f->station);
 			unload.SetUnloadType(OrderUnloadType::Transfer);

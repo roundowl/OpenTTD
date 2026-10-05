@@ -103,11 +103,11 @@ static int GetRoadAccessScore(TileIndex tile, DiagDirection dir)
 }
 
 /**
- * Choose which way the truck bay of a field's entry corner faces.
+ * Choose which way the truck stop of a field's entry corner faces.
  * It faces one of the two sides pointing out of the field, preferring a side with a road next to it.
  * @param area The field rectangle.
  * @param corner The entry corner tile; one of the corners of \a area.
- * @return Entrance direction of the truck bay.
+ * @return Entrance direction of the truck stop.
  */
 static DiagDirection ChooseFieldEntrance(const TileArea &area, TileIndex corner)
 {
@@ -161,7 +161,7 @@ CommandCost CmdBuildField(DoCommandFlags flags, TileIndex tile, TileIndex start_
 	if (ret.Failed()) return ret;
 	cost.AddCost(ret.GetCost());
 
-	/* Connect the bay to the road in front of it, if that road does not point at it yet. */
+	/* Connect the stop to the road in front of it, if that road does not point at it yet. */
 	if (GetRoadAccessScore(start_tile, entrance) == 1) {
 		TileIndex road = TileAddByDiagDir(start_tile, entrance);
 		CommandCost connect = Command<Commands::BuildRoad>::Do(flags, road, DiagDirToRoadBits(ReverseDiagDir(entrance)), GetRoadType(road, RoadTramType::Road), {}, TownID::Invalid());

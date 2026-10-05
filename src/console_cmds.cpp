@@ -570,8 +570,18 @@ static bool ConFarmDemo(std::span<std::string_view> argv)
 	machines.insert(machines.end(), lorries, 25u); // Hereford Grain Truck
 	for (uint local_id : machines) {
 		EngineID engine = EngineID::Invalid();
-		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
-			if (e->grf_prop.local_id == local_id && e->GetGRF() == nullptr) engine = e->index;
+		if (local_id == 88 || local_id == 89) {
+			/* Any buildable machine for the job (NewGRF ones included), the newest one preferred. */
+			FieldTaskType job = local_id == 88 ? FieldTaskType::Cultivate : FieldTaskType::Harvest;
+			for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+				if (!HasBit(e->VehInfo<RoadVehicleInfo>().field_tasks, to_underlying(job))) continue;
+				if (!IsEngineBuildable(e->index, VehicleType::Road, _local_company)) continue;
+				if (engine == EngineID::Invalid() || e->intro_date > Engine::Get(engine)->intro_date) engine = e->index;
+			}
+		} else {
+			for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+				if (e->grf_prop.local_id == local_id && e->GetGRF() == nullptr) engine = e->index;
+			}
 		}
 		if (engine == EngineID::Invalid() || !IsEngineBuildable(engine, VehicleType::Road, _local_company)) {
 			IConsolePrint(CC_ERROR, "Farm engine {} not buildable.", local_id);

@@ -56,6 +56,7 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 	uint8_t ripe_age = 0; ///< Months the crop has been ripe.
 	uint16_t harvest_remainder = 0; ///< Fraction of a cargo unit carried over between harvested quarters, in 1/100.
 	uint32_t last_harvest = 0; ///< Cargo units produced by the most recent harvest run.
+	Money pending_credit = 0; ///< Work credits of field passes since the last harvest, still to be charged to the harvested cargo.
 
 	Field(FieldID index) : FieldPool::PoolItem<&_field_pool>(index) {}
 	~Field() {}
@@ -68,6 +69,7 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 	uint CountEligibleQuarters(FieldTaskType type) const;
 	CommandCost PerformCurrentTask(DoCommandFlags flags);
 	int WorkQuarter(TileIndex tile, uint quarter, FieldTaskType type);
+	CargoType GetCreditCrop() const;
 
 	/**
 	 * Get the current task, if the plan has any.
@@ -85,6 +87,7 @@ struct Field : FieldPool::PoolItem<&_field_pool> {
 
 CargoType GetDefaultFieldCrop();
 uint GetFieldQuarterMaxYield(CargoType crop);
+Money GetFieldWorkCredit(CargoType crop, uint units);
 Money GetFieldTreatmentCost(FieldTaskType type);
 
 #endif /* FIELD_BASE_H */

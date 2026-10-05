@@ -53,6 +53,33 @@ uint GetFieldQuarterMaxYield(CargoType crop)
 }
 
 /**
+ * Work credit of farm machinery: a share of what the crop is worth, paid as transfer income.
+ * Machines show a profit while the company's money only comes from delivering the crop; the
+ * lorry that delivers it shows the delivery income minus these credits, as after any transfer.
+ * One pass of a tractor or spreader over a quarter earns the credit of one unit; a harvester
+ * earns the credit of the units it harvests, paid when it hands them to the field's station.
+ * @param crop The crop's cargo.
+ * @param units Cargo units.
+ * @return 20% of the income for \a units of \a crop hauled 20 tiles without delay.
+ */
+Money GetFieldWorkCredit(CargoType crop, uint units)
+{
+	if (!IsValidCargoType(crop) || units == 0) return 0;
+	return GetTransportedGoodsIncome(units, 20, 0, crop) * 20 / 100;
+}
+
+/**
+ * Get the crop work on the field is credited in: the growing one, the planned one or the climate default.
+ * @return The cargo, or #INVALID_CARGO.
+ */
+CargoType Field::GetCreditCrop() const
+{
+	if (IsValidCargoType(this->crop)) return this->crop;
+	if (IsValidCargoType(this->planned_crop)) return this->planned_crop;
+	return GetDefaultFieldCrop();
+}
+
+/**
  * Is a vehicle farm machinery, i.e. able to work on fields at all?
  * @param v The vehicle.
  * @return True for road vehicles with field tasks.

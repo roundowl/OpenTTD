@@ -1319,10 +1319,22 @@ static bool RoadVehFieldWorkQuarter(RoadVehicle *v, Field *f, const FieldWaypoin
 	TileIndex tile = TileVirtXY(wp.x, wp.y);
 	uint quarter = ((wp.y & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 2 : 0) | ((wp.x & TILE_UNIT_MASK) >= TILE_SIZE / 2 ? 1 : 0);
 	int produced = f->WorkQuarter(tile, quarter, w.task);
-	if (produced > 0) {
+	if (produced < 0) return true; // Nothing to do on this quarter.
+
+	if (w.task != FieldTaskType::Harvest) {
+		/* A field pass: transfer credit for the machine, charged to the crop when it is harvested. */
+		Money credit = GetFieldWorkCredit(f->GetCreditCrop(), 1);
+		v->profit_this_year += credit << 8;
+		f->pending_credit += credit;
+		SetWindowDirty(WindowClass::VehicleDetails, v->index);
+	} else if (produced > 0) {
 		CargoPacket *cp = CargoPacket::Create(f->station, static_cast<uint16_t>(produced), Source{Source::Invalid, SourceType::Industry});
 		/* The harvest counts as loaded at the field's entry corner, for payment distance. */
 		cp->UpdateLoadingTile(f->corner);
+		/* It carries its part of the field passes' credits, spread over the quarters still to harvest. */
+		Money share = f->pending_credit / (f->CountEligibleQuarters(FieldTaskType::Harvest) + 1);
+		f->pending_credit -= share;
+		cp->AddFeederShare(share);
 		v->cargo.Append(cp);
 		SetWindowDirty(WindowClass::VehicleDetails, v->index);
 	}

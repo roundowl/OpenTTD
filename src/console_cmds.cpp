@@ -704,7 +704,7 @@ static bool ConFarmList(std::span<std::string_view> argv)
 	}
 	IConsolePrint(CC_DEFAULT, "{} field(s).", Field::GetNumItems());
 	for (const Field *f : Field::Iterate()) {
-		IConsolePrint(CC_DEFAULT, "  #{}: owner {}, corner {} ({}, {}), {}x{}, station {}, task {}, last harvest {}", f->index, f->owner, f->corner, TileX(f->corner), TileY(f->corner), f->location.w, f->location.h, f->station, f->cur_task, f->last_harvest);
+		IConsolePrint(CC_DEFAULT, "  #{}: owner {}, corner {} ({}, {}), {}x{}, station {}, task {}, last harvest {}, pending credit {}", f->index, f->owner, f->corner, TileX(f->corner), TileY(f->corner), f->location.w, f->location.h, f->station, f->cur_task, f->last_harvest, f->pending_credit);
 		if (!f->tasks.empty()) {
 			std::string seg;
 			for (int s = 0; s < GetFieldSegmentCount(*f); s++) seg += fmt::format(" {}", CountFieldSegmentEligibleQuarters(*f, s, f->tasks[f->cur_task].type));
@@ -718,12 +718,12 @@ static bool ConFarmList(std::span<std::string_view> argv)
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (!rv->IsFrontEngine()) continue;
 		if (!IsFieldMachine(rv)) {
-			IConsolePrint(CC_DEFAULT, "  lorry {}: state {:#x}, frame {}, tile {}, order type {}, cargo {}/{}", rv->unitnumber, rv->state, rv->frame, rv->tile, to_underlying(rv->current_order.GetType()), rv->cargo.StoredCount(), rv->cargo_cap);
+			IConsolePrint(CC_DEFAULT, "  lorry {}: state {:#x}, frame {}, tile {}, order type {}, cargo {}/{}, profit {}", rv->unitnumber, rv->state, rv->frame, rv->tile, to_underlying(rv->current_order.GetType()), rv->cargo.StoredCount(), rv->cargo_cap, rv->profit_this_year >> 8);
 			continue;
 		}
-		IConsolePrint(CC_DEFAULT, "  vehicle {}: {} orders, cur {}, state {:#x}, order type {}, field {}, seg {}, from ({},{}), kind {}, task {}, step {}/{}, cargo {}/{}", rv->unitnumber, rv->GetNumOrders(), rv->cur_real_order_index, rv->state, to_underlying(rv->current_order.GetType()),
+		IConsolePrint(CC_DEFAULT, "  vehicle {}: {} orders, cur {}, state {:#x}, order type {}, field {}, seg {}, from ({},{}), kind {}, task {}, step {}/{}, cargo {}/{}, profit {}", rv->unitnumber, rv->GetNumOrders(), rv->cur_real_order_index, rv->state, to_underlying(rv->current_order.GetType()),
 				rv->state == RVSB_IN_FIELD ? static_cast<int>(rv->field_work.field.base()) : -1, rv->field_work.segment, rv->field_work.from_u, rv->field_work.from_v, to_underlying(rv->field_work.kind), to_underlying(rv->field_work.task),
-				rv->field_work.step, rv->field_work.route.size(), rv->cargo.StoredCount(), rv->cargo_cap);
+				rv->field_work.step, rv->field_work.route.size(), rv->cargo.StoredCount(), rv->cargo_cap, rv->profit_this_year >> 8);
 		std::string orders;
 		for (const Order &o : rv->Orders()) {
 			orders += fmt::format(" [type {} dest {} unload {} load {}]", to_underlying(o.GetType()), o.GetDestination().value,

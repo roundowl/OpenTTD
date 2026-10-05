@@ -60,6 +60,9 @@
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_economy.h"
 
+#include "field_base.h"
+#include "field_func.h"
+
 #include "table/strings.h"
 #include "table/pricebase.h"
 
@@ -1233,6 +1236,13 @@ void CargoPayment::PayFinalDelivery(CargoType cargo, const CargoPacket *cp, uint
  */
 Money CargoPayment::PayTransfer(CargoType cargo, const CargoPacket *cp, uint count, TileIndex current_tile)
 {
+	/* Farm fork: a harvester handing its harvest to its own field's station earns its work credit. */
+	if (IsFieldMachine(this->front) && cp->GetFirstStation() == this->current_station && Field::GetByStation(this->current_station) != nullptr) {
+		Money credit = GetFieldWorkCredit(cargo, count);
+		this->visual_transfer += credit;
+		return credit;
+	}
+
 	/* Pay transfer vehicle the difference between the payment for the journey from
 	 * the source to the current point, and the sum of the previous transfer payments */
 	Money profit = -cp->GetFeederShare(count) + GetTransportedGoodsIncome(

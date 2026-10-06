@@ -713,7 +713,7 @@ static bool ConFarmList(std::span<std::string_view> argv)
 	}
 	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
 		uint8_t tasks = e->VehInfo<RoadVehicleInfo>().field_tasks;
-		if (tasks != 0) IConsolePrint(CC_DEFAULT, "  engine {} ({}): field tasks {:#x}", e->index, GetString(e->info.string_id), tasks);
+		if (tasks != 0) IConsolePrint(CC_DEFAULT, "  engine {} ({}): field tasks {:#x}, intro {}, buildable {}", e->index, GetString(e->info.string_id), tasks, e->intro_date, IsEngineBuildable(e->index, VehicleType::Road, _local_company));
 	}
 	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (!rv->IsFrontEngine()) continue;
